@@ -1,0 +1,5 @@
+
+QExtendClass("QWebControl", "QViewBase",
+{
+	
+});
