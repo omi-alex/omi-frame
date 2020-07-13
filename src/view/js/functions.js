@@ -2096,24 +2096,35 @@ function qIncludeResourcesIfNotIncluded(css, js, user_func, user_func_param)
 		
 		for (var k in css)
 		{
-			var href = css[k];
+			var css_paths = css[k];
+			if (typeof(css_paths) === 'string')
+				css_paths = {0: css_paths};
+			else if (typeof(css_paths) !== 'object')
+				continue;
 			
-			var basehref = href;
-			if (basehref.indexOf("?") > -1)
-				basehref = basehref.substr(0, basehref.indexOf("?"));
-
-			if (href && (!existing[basehref]))
+			for (var $prop in css_paths)
 			{
-				var stylesheet = document.createElement('link');
-                stylesheet.href = href;
-                stylesheet.rel = 'stylesheet';
-                stylesheet.type = 'text/css';
-				/* this will not work in Safari, so we don't wait for CSS to load
-				stylesheet.addEventListener('load', function() {
-					
-				  }, false);
-				*/
-                head_dom.appendChild(stylesheet);
+				var href = css_paths[$prop];
+				if (typeof(href) !== 'string')
+					continue;
+				
+				var basehref = href;
+				if (basehref.indexOf("?") > -1)
+					basehref = basehref.substr(0, basehref.indexOf("?"));
+
+				if (href && (!existing[basehref]))
+				{
+					var stylesheet = document.createElement('link');
+					stylesheet.href = href;
+					stylesheet.rel = 'stylesheet';
+					stylesheet.type = 'text/css';
+					/* this will not work in Safari, so we don't wait for CSS to load
+					stylesheet.addEventListener('load', function() {
+
+					  }, false);
+					*/
+					head_dom.appendChild(stylesheet);
+				}
 			}
 		}
 	}
@@ -2138,32 +2149,43 @@ function qIncludeResourcesIfNotIncluded(css, js, user_func, user_func_param)
 		
 		for (var k in js)
 		{
-			var src = js[k];
+			var js_paths = js[k];
+			if (typeof(js_paths) === 'string')
+				js_paths = {0: js_paths};
+			else if (typeof(js_paths) !== 'object')
+				continue;
 			
-			var basesrc = src;
-			if (basesrc.indexOf("?") > -1)
-				basesrc = basesrc.substr(0, basesrc.indexOf("?"));
-			
-			if (src && (!existing[basesrc]))
+			for (var $prop in js_paths)
 			{
-				var js_script = document.createElement('script');
-                js_script.src = src;
-                js_script.type = 'text/javascript';
-				
-				includes_remaining++;
-				include_count++;
-				
-				js_script.addEventListener('load', function(){
-					
-					includes_remaining--;
-					if (includes_remaining <= 0)
-					{
-						user_func(user_func_param);
-					}
-					}, false);
-				  
-				//qbDebug(js_script.src, 1);
-                head_dom.appendChild(js_script);
+				var src = js_paths[$prop];
+				if (typeof(src) !== 'string')
+					continue;
+
+				var basesrc = src;
+				if (basesrc.indexOf("?") > -1)
+					basesrc = basesrc.substr(0, basesrc.indexOf("?"));
+
+				if (src && (!existing[basesrc]))
+				{
+					var js_script = document.createElement('script');
+					js_script.src = src;
+					js_script.type = 'text/javascript';
+
+					includes_remaining++;
+					include_count++;
+
+					js_script.addEventListener('load', function(){
+
+						includes_remaining--;
+						if (includes_remaining <= 0)
+						{
+							user_func(user_func_param);
+						}
+						}, false);
+
+					//qbDebug(js_script.src, 1);
+					head_dom.appendChild(js_script);
+				}
 			}
 		}
 	}

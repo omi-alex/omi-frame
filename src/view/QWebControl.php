@@ -270,7 +270,7 @@ class QWebControl extends QViewBase
 					continue;
 
 					if (is_scalar($js))
-						$js = [$js];
+						$js = [$js => $js];
 					
 					foreach ($js as $js_path) :
 						if (empty($js_path))
