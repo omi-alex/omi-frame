@@ -275,7 +275,7 @@ class QViewBase extends QModel
 		{
 			$js_paths = QAutoload::GetJsClassPath($class);
 			$css_paths = QAutoload::GetCssClassPath($class);
-
+			
 			// self::$IncludeJs[$class] = $js_path ? QApp::GetWebPath($js_path) : "";
 			/*if ($js_path && (!$dev_mode) && file_exists(substr($js_path,0, -2)."min.js"))
 				$js_path = substr($js_path, 0, -2)."min.js";
@@ -283,14 +283,15 @@ class QViewBase extends QModel
 				$css_path = substr($css_path, 0, -3)."min.css";*/
 
 			if (is_scalar($js_paths))
-				$js_paths = [$js_paths];
+				$js_paths = [$js_paths => $js_paths];
 
 			foreach ($js_paths ?: [] as $js_path)
 			{
 				$js_web_path = $js_path ? QApp::GetWebPath($js_path) : "";
 				if (!empty($js_web_path))
 				{
-					$data_js[$class] = $js_web_path;
+					$data_js[$class][$js_web_path] = $js_web_path;
+					# self::$IncludeJs[$class][$js_web_path] = $js_web_path;
 				}
 			}
 			
@@ -302,15 +303,26 @@ class QViewBase extends QModel
 				$css_web_path = $css_path ? QApp::GetWebPath($css_path) : "";
 				if (!empty($css_web_path))
 				{
-					$data_css[$class] = $css_web_path;
+					$data_css[$class][$css_web_path] = $css_web_path;
+					# self::$IncludeCss[$class][$css_web_path] = $css_web_path;
 				}
 			}
 
 			$class = get_parent_class($class);
 		}
-
-		self::$IncludeJs += array_reverse($data_js);
-		self::$IncludeCss += array_reverse($data_css);
+		
+		foreach (array_reverse($data_js) as $f_class => $paths)
+		{
+			foreach ($paths as $path)
+				self::$IncludeJs[$f_class][$path] = $path;
+		}
+		foreach (array_reverse($data_css) as $f_class => $paths)
+		{
+			foreach ($paths as $path)
+				self::$IncludeCss[$f_class][$path] = $path;
+		}
+		# self::$IncludeJs += array_reverse($data_js);
+		# self::$IncludeCss += array_reverse($data_css);
 	}
 	
 	public static function GetResourcesForClass($class = null)
@@ -526,7 +538,7 @@ class QViewBase extends QModel
 		{
 			if (isset(self::$IncludeJs[$k]))
 				continue;
-			self::$IncludeJs[$k] = $v;
+			self::$IncludeJs[$k][$v] = $v;
 		}
 	}
 	
@@ -537,7 +549,7 @@ class QViewBase extends QModel
 			if (isset(self::$IncludeCss[$k]))
 				continue;
 
-			self::$IncludeCss[$k] = $v;
+			self::$IncludeCss[$k][$v] = $v;
 		}	
 	}
 	
