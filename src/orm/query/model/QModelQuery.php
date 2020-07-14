@@ -919,6 +919,7 @@ class QModelQuery
 		
 		$all_props = ($idf_name === "*");
 		$caption_props = ($idf_name === "\$CaptionProperties");
+		$type_target = ($idf_name === "Type__");
 	
 		/**
 		 * foreach possible type we handle for the identifier
@@ -953,6 +954,10 @@ class QModelQuery
 				if (!$caption_props)
 					continue;
 				$c_prop = current($caption_props);
+			}
+			else if ($type_target)
+			{
+				$c_prop = $idf_name;
 			}
 			else
 				$c_prop = $idf_name;
@@ -994,8 +999,12 @@ class QModelQuery
 					// we need to index the property ALIAS based on query/property name, if it was already set do not set it again
 					$prop_as = $prop_as_index[$from_q->as][$c_prop] ?: ($prop_as_index[$from_q->as][$c_prop] = $from_q->getNextAlias());
 
-					// reading property information from the cache
-					$prop_types = $all_props ? current($type_inf) : $type_inf[$c_prop];
+					if ($type_target)
+						# this is to make sure Type__ will point to the $_type column
+						$prop_types = ["vc" => "\$_type", 'rc_t' => ['integer'], '$' => ['integer'],];
+					else
+						// reading property information from the cache
+						$prop_types = $all_props ? current($type_inf) : $type_inf[$c_prop];
 
 					// one type may not have this property, we continue for the other types
 					if (!$prop_types)
