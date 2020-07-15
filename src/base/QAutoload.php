@@ -952,7 +952,9 @@ final class QAutoload
 						
 						$sync->resync($info, $changed, $removed_files, $new, $full_resync);
 						
-						file_put_contents($save_state_path, qArrayToCode($info, "Q_FILES_STATE_SAVE"));
+						$failed = file_put_contents($save_state_path, qArrayToCode($info, "Q_FILES_STATE_SAVE"));
+						if ($failed === false)
+							throw new \Exception('Unable to save files state');
 						opcache_invalidate($save_state_path, true);
 					}
 					else
