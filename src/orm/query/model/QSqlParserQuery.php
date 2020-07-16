@@ -442,6 +442,7 @@ class QSqlParserQuery
 		$t1 = microtime(true);
 		$result = $conn->query($exe_q);
 		$t2 = microtime(true);
+		
 		// qvdumptofile($exe_q, $t2 - $t1);
 		// echo $exe_q;
 		// echo ($t2 - $t1)." seconds<hr/>";
