@@ -305,11 +305,16 @@ class QViewBase extends QModel
 
 			foreach ($css_paths ?: [] as $css_path)
 			{
+				if (empty($css_path))
+					continue;
 				$css_web_path = $css_path ? QApp::GetWebPath($css_path) : "";
 				if (!empty($css_web_path))
-				{
 					$data_css[$class][$css_web_path] = $css_web_path;
-					# self::$IncludeCss[$class][$css_web_path] = $css_web_path;
+				if (file_exists(substr($css_path, 0, -4).".gen.css"))
+				{
+					$css_web_path_gen = $css_path ? QApp::GetWebPath(substr($css_path, 0, -4).".gen.css") : "";
+					if (!empty($css_web_path_gen))
+						$data_css[$class][$css_web_path_gen] = $css_web_path_gen;
 				}
 			}
 
