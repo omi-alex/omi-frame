@@ -284,14 +284,19 @@ class QViewBase extends QModel
 
 			if (is_scalar($js_paths))
 				$js_paths = [$js_paths => $js_paths];
-
+			
 			foreach ($js_paths ?: [] as $js_path)
 			{
+				if (empty($js_path))
+					continue;
 				$js_web_path = $js_path ? QApp::GetWebPath($js_path) : "";
 				if (!empty($js_web_path))
-				{
 					$data_js[$class][$js_web_path] = $js_web_path;
-					# self::$IncludeJs[$class][$js_web_path] = $js_web_path;
+				if (file_exists(substr($js_path, 0, -3).".gen.js"))
+				{
+					$js_web_path_gen = $js_path ? QApp::GetWebPath(substr($js_path, 0, -3).".gen.js") : "";
+					if (!empty($js_web_path_gen))
+						$data_js[$class][$js_web_path_gen] = $js_web_path_gen;
 				}
 			}
 			

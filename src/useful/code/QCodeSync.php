@@ -1651,7 +1651,7 @@ class QCodeSync
 			
 			if ($render_code->jsFunc)
 			{
-				$js_path = substr($element->getTemplatePath(""), 0, -3)."js";
+				$js_path = substr($element->getTemplatePath(""), 0, -4).".gen.js";
 				$contents = file_exists($js_path) ? file_get_contents($js_path) : "";
 				foreach ($render_code->jsFunc as $func_tag => $func_code)
 				{
@@ -1709,8 +1709,8 @@ class QCodeSync
 						$contents .= "\n\n".$code_id_tag."\n".$func_str."\n".$code_id_tag_end."\n\n";
 				}
 
-				self::filePutContentsIfChanged($js_path, $contents);
-
+				$rc_jsp = self::filePutContentsIfChanged($js_path, $contents);
+				
 				$js_debug_path = "/".ltrim(substr($js_path, strlen($_SERVER["DOCUMENT_ROOT"])), "/");
 
 				$debug_log .= "Generating (".count($render_code->jsFunc).") JS Functions to: {$js_debug_path}\n";

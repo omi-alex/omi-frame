@@ -663,7 +663,8 @@ final class QAutoload
 						
 						// if it's a generated file we don't care if it was modified or not
 						// for CSS / JS we only track their presence
-						if (($ext === "php") && ($sub_ext = substr($f, - strlen($ext) - 5, 4)) && (($sub_ext === ".gen") || ($sub_ext === ".dyn")))
+						if ((($ext === "php") || ($ext === "js") || ($ext === "css")) && 
+								($sub_ext = substr($f, - strlen($ext) - 5, 4)) && (($sub_ext === ".gen") || ($sub_ext === ".dyn")))
 						{
 							unset($files_state[$rel]);
 						}
@@ -855,9 +856,22 @@ final class QAutoload
 
 					// changed files : $changed
 					// removed files : $files_state
-					
-					if ($full_resync || $new || $changed || $files_state)
+					if ((!$full_resync) && $changed && (!$new) && (!$files_state) && $changed[Q_FRAME_PATH] && (count($changed) === 1))
 					{
+						# frame only changes will not trigger any sync ! It should not be patched anywhere !
+						# if in the frame, do not do any complicated sync
+						$failed = file_put_contents($save_state_path, qArrayToCode($info, "Q_FILES_STATE_SAVE"));
+						if ($failed === false)
+							throw new \Exception('Unable to save files state');
+						opcache_invalidate($save_state_path, true);
+					}
+					else if ($full_resync || $new || $changed || $files_state)
+					{
+						if ($changed)
+						{
+							
+						}
+						
 						static::$HasChanges = true;
 						// based on some files dependency the code sync should be able to manage the issues 
 						$Q_RUN_CODE_NEW_AS_TRAITS = defined('Q_RUN_CODE_NEW_AS_TRAITS') && Q_RUN_CODE_NEW_AS_TRAITS;
