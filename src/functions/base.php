@@ -2979,7 +2979,11 @@ function _T($uid, $defaultText)
 	// $c_user = \Omi\User::GetCurrentUser();
 	// qvar_dumpk($c_user);
 	
-	$ret_text = ($_T___INF_LANG && $_T___INF_DATA && (($txt = $_T___INF_DATA[$_T___INF_LANG][$uid]) !== null)) ? $txt : $defaultText;
+	if ($_T___INF_LANG && $_T___INF_DATA)
+		$ret_text = (($txt = $_T___INF_DATA[$_T___INF_LANG][$uid]) !== null) ? $txt : 
+					((($s_txt = $_T___INF_DATA[$_T___INF_LANG][$defaultText]) !== null) ? $s_txt : $defaultText);
+	else
+		$ret_text = $defaultText;
 	if (false && \QAutoload::GetDevelopmentMode()) # || ($_SERVER['REMOTE_ADDR'] === '176.24.78.34'))
 	{
 		# get the trace no matter what
@@ -3021,9 +3025,7 @@ function _L($tag, $lang = null, $arg_1 = null, $arg_2 = null, $arg_3 = null, $ar
 {
 	$dt = QLanguage::$Data[$tag];
 	if ($dt === null)
-	{
 		return _T($tag, $tag);
-	}
 	if ($lang === null)
 		$lang = QModel::GetLanguage_Dim();
 	$data = $dt[$lang];
