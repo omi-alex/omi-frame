@@ -1265,8 +1265,11 @@ trait QModel_Trait
 
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.DefaultOffer" => ["Offers"],
 
-		"Offers.Items.Merch.DefaultOffer.Services" => ["Services"],
-		"Offers.Items.Merch.DefaultOffer.Products" => ["Products"],
+		"Offers.Items.Merch.DefaultOffer.Services" => false,
+		"Offers.Items.Merch.DefaultOffer.Products" => false,
+		
+		"Offers.Items.Merch.DefaultOffer.Services.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.DefaultOffer.Products.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
 		
 		# Owners
 		"Offers.Owner" => ["Suppliers"],
