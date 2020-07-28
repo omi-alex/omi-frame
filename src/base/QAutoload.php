@@ -867,11 +867,6 @@ final class QAutoload
 					}
 					else if ($full_resync || $new || $changed || $files_state)
 					{
-						if ($changed)
-						{
-							
-						}
-						
 						static::$HasChanges = true;
 						// based on some files dependency the code sync should be able to manage the issues 
 						$Q_RUN_CODE_NEW_AS_TRAITS = defined('Q_RUN_CODE_NEW_AS_TRAITS') && Q_RUN_CODE_NEW_AS_TRAITS;
