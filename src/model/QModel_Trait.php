@@ -1307,6 +1307,9 @@ trait QModel_Trait
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.Content.Owner" => ["Suppliers"],
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.Owner" => ["Suppliers"],
 		
+		"PricingIntervals.Owner" => ["Suppliers"],
+		"PricingIntervals.Owner.WhiteLabel" => false,
+		
 		# Partners
 		
 		"Resellers.HeadOffice" => false,

@@ -45,9 +45,12 @@ trait QModel_Common_View
 			}
 		}
 		
-		return preg_replace_callback('/(?<!\b)[A-Z][a-z]+|(?<=[a-z])[A-Z]/', function($match) {
+		$caption = preg_replace_callback('/(?<!\b)[A-Z][a-z]+|(?<=[a-z])[A-Z]/', function($match) {
 			return ' '. $match[0];
 		}, $caption);
+		$caption = preg_replace("/([\\_\\s])+/uis", " ", $caption);
+		
+		return $caption;
 
 		/*
 		return preg_replace_callback("/(( Or)(?= )|( Or$))|(( Of)(?= )|( Of$))|(( The)(?= )|( The$))|(( And)(?= )|( And$))/", function ($matches) {
