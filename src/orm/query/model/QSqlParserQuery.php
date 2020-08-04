@@ -441,7 +441,29 @@ class QSqlParserQuery
 		
 		$t1 = microtime(true);
 		$result = $conn->query($exe_q);
+		
+		/*
+		$find_that_bad_query = ['Nuvia_Numbers',
+					'Nuvia_Groups_Hunt',
+					'Nuvia_Groups_Pickup',
+					'GenbandSBC_Endpoints',
+					'ProvisioningProgress',
+					'VOIP_NumbersSuppliers',
+					'HasService',
+					'Generated',
+					'$$App$Numbers',];
+		*/
+		
 		$t2 = microtime(true);
+		
+		if (($t2 - $t1) >= 30) # slow query log
+		{
+			if (!is_dir('temp/slow_query/'))
+				qmkdir('temp/slow_query/');
+			ob_start();
+			qvar_dumpk("Time (sec): ".($t2 - $t1), $exe_q, debug_backtrace());
+			file_put_contents("temp/slow_query/".round($t2 - $t1)."__".date("Y-m-d H:i:s")."__".uniqid().".html", ob_get_clean());
+		}
 		
 		// qvdumptofile($exe_q, $t2 - $t1);
 		// echo $exe_q;
