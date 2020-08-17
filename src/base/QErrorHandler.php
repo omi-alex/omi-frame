@@ -242,10 +242,12 @@ class QErrorHandler
 	 */
 	public static function LogError($ex, $err_uid = null, $backtrace_stack = null)
 	{
+		if (is_string($ex))
+			$ex = new \Exception($ex);
 		if (!$err_uid)
 			$err_uid = uniqid();
 		if (!$backtrace_stack)
-			$ex->getTrace();
+			$backtrace_stack = $ex->getTrace();
 		
 		$file_path = QAutoload::GetRuntimeFolder()."temp/error_logs/".date("Y/m/d_").$err_uid.".log.html";
 		$dir = dirname($file_path);
