@@ -261,8 +261,11 @@ class QErrorHandler
 		echo "<div><b>File: </b>{$ex->getFile()}</div>";
 		echo "<div><b>Line: </b>{$ex->getLine()}</div>";
 		echo "<div><b>Error Id: </b>{$err_uid}</div>";
-		echo "<div><b>STACK:</b></div>";
-		qvar_dumpk($backtrace_stack);
+		if ($backtrace_stack)
+		{
+			echo "<div><b>STACK:</b></div>";
+			qvar_dumpk($backtrace_stack);
+		}
 		echo "<div><b>REQUEST INFO:</b></div>";
 		qvar_dumpk(['$_SERVER' => $_SERVER, '$_GET' => $_GET, '$_POST' => $_POST, '$_SESSION' => $_SESSION, "SESSION_ID" => session_id()]);
 		if (class_exists('Omi\App'))
