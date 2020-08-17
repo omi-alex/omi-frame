@@ -62,7 +62,7 @@ class QErrorHandler
 		
 		$errno = $ex->getCode();
 		
-		if (($errno == E_NOTICE) || ($errno == E_USER_NOTICE) || ($errno == E_STRICT) || ($errno == E_DEPRECATED))
+		if (($errno == E_NOTICE) || ($errno == E_USER_NOTICE) || ($errno == E_STRICT) || ($errno == E_WARNING) || ($errno == E_DEPRECATED))
 		{
 			/**
 			 * @todo Handle notice also
@@ -82,6 +82,7 @@ class QErrorHandler
 		{
 			if (QAutoload::GetDevelopmentMode())
 			{
+				self::LogError($ex, $err_uid, $backtrace_stack);
 				echo self::GetExceptionToHtml($ex, $headers_sent ? false : true);
 				return;
 			}
@@ -140,6 +141,7 @@ class QErrorHandler
 				// this will be handled later
 				/*$data = array("Message" => $ex->getMessage(), "erruid" => $err_uid, "File" => $ex->getFile(), 
 					"Line" => $ex->getLine(), "Stack" => $ex->getTraceAsString(), "trace" => $backtrace_stack);*/
+				self::LogError($ex, $err_uid, $backtrace_stack);
 			}
 		}
 	}
@@ -253,10 +255,30 @@ class QErrorHandler
 		$dir = dirname($file_path);
 		if (!is_dir($dir))
 			qmkdir($dir, true);
+		
 		ob_start();
 		echo "<h3>".$ex->getMessage()."</h3>";
+		echo "<div><b>File: </b>{$ex->getFile()}</div>";
+		echo "<div><b>Line: </b>{$ex->getLine()}</div>";
 		echo "<div><b>Error Id: </b>{$err_uid}</div>";
-		qvar_dump($backtrace_stack);
+		echo "<div><b>STACK:</b></div>";
+		qvar_dumpk($backtrace_stack);
+		echo "<div><b>REQUEST INFO:</b></div>";
+		qvar_dumpk(['$_SERVER' => $_SERVER, '$_GET' => $_GET, '$_POST' => $_POST, '$_SESSION' => $_SESSION, "SESSION_ID" => session_id()]);
+		if (class_exists('Omi\App'))
+		{
+			echo "<div><b>Omi\App :: Statics</b></div>";
+			$class = new ReflectionClass('Omi\App');
+			$staticProperties = $class->getStaticProperties();
+			qvar_dumpk($staticProperties);
+		}
+		if (class_exists('Omi\User'))
+		{
+			echo "<div><b>Omi\User :: Statics</b></div>";
+			$class = new ReflectionClass('Omi\User');
+			$staticProperties = $class->getStaticProperties();
+			qvar_dumpk($staticProperties);
+		}
 		$data = ob_get_clean();
 		
 		// echo $data;
