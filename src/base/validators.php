@@ -64,6 +64,7 @@ $_Q_Fixers = [
 	"trim" => "(\$value !== null) ? trim(\$value) : null",
 	"maxSelector(\$_maxselector_)" => "qIntersectSelectors(\$_maxselector_, \$value)",
 	"secureSelector(\$_className_, \$_maxselector_)" => "qSecureSelector(\$_className_, \$value, \$_maxselector_)",
+	"q_fix_mac" => "implode(':', str_split(preg_replace('/[^\\w]+/uis', '', trim(\$value)), 2))",
 ];
 
 $_Q_Encoders = [
