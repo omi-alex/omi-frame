@@ -1214,7 +1214,374 @@ trait QModel_Trait
 		
 		return $ret;
 	}
+	
+	
+	/**
+	 * Extracts data from a JSON string
+	 * 
+	 * @param string $json_string
+	 * @param string $type
+	 * @param string|array $selector In this case a null selector means we will not use a selector
+	 * 
+	 * @return QIModel
+	 */
+	public static function FromJSON($json_string, $type = "auto", $selector = null, $include_nonmodel_properties = false)
+	{
+		$data_array = json_decode($json_string, true);
+		$type = ($type === "auto") ? get_called_class() : $type;
+		return self::FromArray($data_array, $type, $selector, $include_nonmodel_properties);
+	}
+	
+	/**
+	 * Extracts data from a simple PHP array
+	 * 
+	 * @param array $array
+	 * @param string $type Examples: Order, Order[], 
+	 * @param string|array $selector In this case a null selector means we will not use a selector
+	 * 
+	 * @return QIModel|QIModel[]
+	 */
+	public static function FromArray($array, $type = "auto", $selector = null, $include_nonmodel_properties = false)
+	{
+		if ($array === null)
+			return null;
+		else if (!is_array($array))
+			throw new Exception("Input argument \$array must be an array or null");
+		
+		$using_called_class = null;
+		$type = ($type === "auto") ? ($using_called_class = get_called_class()) : $type;
+		
+		if (is_string($selector))
+			$selector = qParseEntity($selector);
+		
+		// we also accept $type = "array"
+		if ($type === "array")
+		{
+			$is_array = true;
+			// switching back to auto
+			$type = "auto";
+		}
+		else if (substr($type, -2, 2) === "[]")
+		{
+			$is_array = true;
+			$type = substr($type, 0, -2);
+		}
+		else if ($using_called_class && (key($array) === 0))
+			// we have an non-associative array inside an array, that means we have an array of elements
+			$is_array = true;
+		else if (($arr_class = $array["_ty"]) && class_exists($arr_class) && qIsA($arr_class, "QIModelArray"))
+			$is_array = true;
+		else
+			$is_array = false;
+		
+		if ($is_array)
+		{
+			if (($arr_class ?: $array["_ty"]) !== null)
+			{
+				if (class_exists($arr_class) && qIsA($arr_class, "QIModelArray"))
+					$ret = new $arr_class();
+				unset($array["_ty"]);
+			}
+			else
+				$ret = new QModelArray();
 
+			$items_array = $array["_items"] ?: $array;
+			foreach ($items_array as $k => $item)
+			{
+				// repeat logic
+				if (is_array($item))
+				{
+					$i_class = (($c = $item["_ty"]) && class_exists($c)) ? $c : (((($type{0} === "\\") || ($type{0} !== strtolower($type{0}))) && class_exists($type)) ? $type : null);
+					$ret[$k] = static::FromArray($item, $i_class, $selector, $include_nonmodel_properties);
+				}
+				else
+					$ret[$k] = $item;
+			}
+			return $ret;
+		}
+		else
+		{
+			$class = (($c = $array["_ty"]) && class_exists($c)) ? $c : (((($type{0} === "\\") || ($type{0} !== strtolower($type{0}))) && class_exists($type)) ? $type : null);
+			if (!$class)
+				throw new Exception("Unable to determine type for input data");
+			$obj = new $class();
+			if (($obj_id = $array["_id"]) !== null)
+				$obj->setId($obj_id);
+			$refs = [];
+			$obj->extractFromArray($array, $selector, null, $include_nonmodel_properties, $refs);
+			return $obj;
+		}
+	}
+	
+	public function extractFromArray($array, $selector = null, $parent = null, $include_nonmodel_properties = false, &$refs = null)
+	{
+		$all_keys = $selector && ($selector["*"] !== null);
+		$type_inf = QModelQuery::GetTypesCache(get_class($this));
+		
+		$wst = $array["_wst"];
+		
+		foreach($array as $k => $v)
+		{
+			switch ($k)
+			{
+				case "_id":
+				{
+					if ($v !== null)
+						$this->setId($v);
+					break;
+				}
+				case "_ty":
+				case "_tmpid":
+				case "_iro":
+				{
+					// ignore
+					break;
+				}
+				case "_ts":
+				{
+					$this->_ts = (int)$v;
+					break;
+				}
+				case "_tsp":
+				{
+					$this->_tsp = $v;
+					break;
+				}
+				case "_uploads":
+				{
+					if (is_array($v))
+					{
+						foreach ($v as $upload_key => $upload_info)
+						{
+							$prop_inf = $this->getModelType()->properties[$upload_key];
+							if ($prop_inf)
+							{
+								$upload_Path = $prop_inf->storage["filePath"];
+								if ($upload_Path && ($upload_info["error"] == 0) && file_exists($upload_info["tmp_name"]))
+								{
+									$save_dir = rtrim($upload_Path, "\\/")."/";
+									if (!is_dir($save_dir))
+										qmkdir($save_dir);
+									
+									$save_path_fn = pathinfo($upload_info["name"], PATHINFO_FILENAME);
+									$save_path_ext = pathinfo($upload_info["name"], PATHINFO_EXTENSION);
+									$index = 0;
+									// make sure we don't overwrite
+									while (file_exists($save_path = $save_dir.$save_path_fn.($index ? "-".$index : "").".".$save_path_ext))
+											$index++;
+									move_uploaded_file($upload_info["tmp_name"], $save_path);
+									
+									$upload_Mode = $prop_inf->storage["fileMode"];
+									if ($upload_Mode)
+										chmod($save_path, octdec($upload_Mode));
+									$upload_withPath = $prop_inf->storage["fileWithPath"];
+									$property_value = $upload_withPath ? $save_path : basename($save_path);
+									$this->{"set{$upload_key}"}($property_value);
+									$array[$upload_key] = $property_value;
+								}
+							}
+						}
+					}
+					break;
+				}
+				case "_rowi":
+				{
+					$this->_rowi = $v;
+					break;
+				}
+				default:
+				{
+					// not in the selector
+					// or we have wst flag and the property was not set
+					if (($k{0} === "_") || (($selector !== null) && (!$all_keys) && ($selector[$k] === null)) || ($wst && !$wst[$k]))
+						continue;
+
+					$ty = gettype($v);
+					
+					/* "boolean" "integer" "double" "string" "array" "object" "resource" "NULL" "unknown type"*/
+					switch ($ty)
+					{
+						case "string":
+						case "NULL":
+						case "integer":
+						case "boolean":
+						case "double":
+						{
+							if (is_string($v) && (strtolower($v) === "null"))
+								$v = null;
+
+							if ($this->getModelType()->properties[$k])
+								$this->{"set{$k}"}($v);
+							else
+								$this->{$k} = $v;
+							break;
+						}
+						case "array":
+						{
+							$expected_type = null;
+							if (($vc = $v["_ty"]) && class_exists($vc))
+							{
+								$expected_type = $vc;
+								unset($v["_ty"]);
+							}
+							else
+							{
+								$prop_inf = $type_inf[$k];
+								if ($prop_inf["[]"])
+									// is collection
+									$expected_type = "\\QModelArray";
+								else
+								{
+									if (!$prop_inf["#"])
+									{
+										qvardump($k, $v);
+										throw new \Exception("Expected type cannot be identified!");
+									}
+									$expected_type = "\\".reset($prop_inf["#"]);
+								}
+							}
+							
+							if ($expected_type && class_exists($expected_type))
+							{
+								$obj_id = is_array($v) ? ($v["_id"] ?: ($v["Id"] ?: ($v["id"] ?: $v["ID"]))) : null;
+								if ($obj_id)
+									$obj = $refs[$obj_id][$expected_type] ?: ($refs[$obj_id][$expected_type] = new $expected_type());
+								else
+									$obj = new $expected_type();
+								
+								// if we have _wst we should setup only properties that were set when encode to array
+								$prop_selector = $selector[$k];
+								
+								if ($obj instanceof QIModelArray)
+								{
+									$obj->setModelProperty($this->getModelType()->properties[$k], $this);
+									$this->{"set{$k}"}($obj);
+									
+									if (isset($v["_tsp"]))
+									{
+										$obj->_tsp = $v["_tsp"];
+										unset($v["_tsp"]);
+									}
+									if (isset($v["_rowi"]))
+									{
+										$obj->_rowi = $v["_rowi"];
+										unset($v["_rowi"]);
+									}
+									if (isset($v["_iro"]))
+									{
+										// $obj->_rowi = $v["_iro"];
+										unset($v["_iro"]);
+									}
+									
+									// for backward compatibility
+									if (isset($v["_items"]))
+									{
+										$use_v = $v["_items"];
+										unset($v["_items"]);
+									}
+									else
+										$use_v = $v;
+
+									/*
+									if (($use_v = $v["_items"]))
+									{
+										unset($v["_items"]);
+									}
+									else
+										$use_v = $v;
+									*/
+
+									foreach ($use_v as $vk => $vv)
+									{
+										if (is_array($vv))
+										{
+											$v_expected_type = null;
+											if (($vc = $vv["_ty"]) && class_exists($vc))
+												$v_expected_type =  $vc;
+											else
+												$v_expected_type = reset($type_inf[$k]["[]"]["#"]);
+
+											if ($v_expected_type && class_exists($v_expected_type))
+											{
+												$v_obj_id = is_array($vv) ? ($vv["_id"] ?: ($vv["Id"] ?: ($vv["id"] ?: $vv["ID"]))) : null;
+												if ($v_obj_id)
+													$v_obj = $refs[$v_obj_id][$v_expected_type] ?: ($refs[$v_obj_id][$v_expected_type] = new $v_expected_type());
+												else
+													$v_obj = new $v_expected_type();
+												
+												if ($v_obj instanceof QIModel)
+													$v_obj->extractFromArray($vv, $prop_selector, $obj, $include_nonmodel_properties, $refs);
+
+												$this->{"set{$k}_Item_"}($v_obj, $vk);
+											}
+											else 
+												$this->{"set{$k}_Item_"}($vv, $vk);
+										}
+										else
+										{
+											$this->{"set{$k}_Item_"}($vv, $vk);
+										}
+									}
+									
+									# here we unset all _rowi,_tsp where there is no data, to avoid issues if we get a populate
+									{
+										$unset_rowis = [];
+										foreach ($obj->_rowi ?: [] as $rowi_itm_pos => $rowi_itm_id)
+										{
+											if (!isset($obj[$rowi_itm_pos]))
+												$unset_rowis[] = $rowi_itm_pos;
+										}
+										foreach($unset_rowis as $unsetri_key)
+											unset($obj->_rowi[$unsetri_key]);
+										
+										$unset_tsps = [];
+										foreach ($obj->_tsp ?: [] as $tsp_itm_pos => $tsp_itm_state)
+										{
+											if (!isset($obj[$tsp_itm_pos]))
+												$unset_tsps[] = $tsp_itm_pos;
+										}
+										foreach($unset_tsps as $unsettsp_key)
+											unset($obj->_tsp[$unsettsp_key]);
+									}
+									
+									/*
+									if (\QAutoload::GetDevelopmentMode())
+									{
+										# we need to set the transform state info on the items where possible
+										if ($obj->_tsp && $obj->_rowi)
+										{
+											foreach ($obj->_tsp as $_tsp_pos => $_tsp_state)
+											{
+												if (($_tsp_state & \QModel::TransformDelete) && ($obj[$_tsp_pos] instanceof \QIModel))
+													$obj[$_tsp_pos]->setTransformState($_tsp_state);
+											}
+										}
+									}
+									*/
+								}
+								else if ($obj instanceof QIModel)
+								{
+									$obj->extractFromArray($v, $prop_selector, $this, $include_nonmodel_properties, $refs);
+									$this->{"set{$k}"}($obj);
+								}
+								else
+									$this->{"set{$k}"}($obj);
+							}
+							else
+								$this->{"set{$k}"}($v);
+							
+							break;
+						}
+						case "object":
+						{
+							throw new Exception("should not be, to do ?!");
+						}
+					}
+				}
+			}
+		}
+	}
+	
 	protected static $Sync_Mapping = [
 		"Offers.NuviaOffer" => ["Nuvia_Offers"],
 		"Offers.NuviaOffer.Item" => false,
