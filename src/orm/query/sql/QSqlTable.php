@@ -1817,7 +1817,7 @@ class QSqlTable extends QStorageTable
 							
 							$yield_reqsts = $select_return_index[json_encode($r_binds)];
 							if (!$yield_reqsts)
-									throw new \Exception('Error we could not id the request. Review the way you index data in $select_return_index.');
+								throw new \Exception('Error we could not id the request. Review the way you index data in $select_return_index.');
 							
 							foreach ($yield_reqsts as $yield_req)
 								$yield_req->result = $record;

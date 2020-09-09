@@ -441,19 +441,6 @@ class QSqlParserQuery
 		
 		$t1 = microtime(true);
 		$result = $conn->query($exe_q);
-		
-		/*
-		$find_that_bad_query = ['Nuvia_Numbers',
-					'Nuvia_Groups_Hunt',
-					'Nuvia_Groups_Pickup',
-					'GenbandSBC_Endpoints',
-					'ProvisioningProgress',
-					'VOIP_NumbersSuppliers',
-					'HasService',
-					'Generated',
-					'$$App$Numbers',];
-		*/
-		
 		$t2 = microtime(true);
 		
 		if (($t2 - $t1) >= 30) # slow query log

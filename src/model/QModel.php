@@ -3988,7 +3988,7 @@ class QModel implements QIModel
 						$pp_comma = ",";
 					}
 					default:
-						continue;
+						break;
 				}
 
 				if ($all_keys)
@@ -4103,7 +4103,7 @@ class QModel implements QIModel
 					$pp_comma = ",";
 				}
 				default:
-					continue;
+					break;
 			}
 		}
 		$str .= "}";

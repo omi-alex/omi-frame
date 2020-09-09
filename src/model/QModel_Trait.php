@@ -1394,7 +1394,7 @@ trait QModel_Trait
 					// not in the selector
 					// or we have wst flag and the property was not set
 					if (($k{0} === "_") || (($selector !== null) && (!$all_keys) && ($selector[$k] === null)) || ($wst && !$wst[$k]))
-						continue;
+						break;
 
 					$ty = gettype($v);
 					
