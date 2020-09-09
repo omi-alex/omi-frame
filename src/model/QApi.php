@@ -1220,7 +1220,7 @@ class QApi
 		}
 
 		$q = static::__Query(($initialFrom !== $from) ? [$from, $initialFrom] : $from, $selector, $parameters, $only_first, $id);
-
+		
 		return $q;
 	}
 	
