@@ -1218,7 +1218,7 @@ class QApi
 				$parameters = [];
 			$parameters = array_merge($parameters, $fromParams);
 		}
-
+		
 		$q = static::__Query(($initialFrom !== $from) ? [$from, $initialFrom] : $from, $selector, $parameters, $only_first, $id);
 		
 		return $q;
