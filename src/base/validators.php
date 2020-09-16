@@ -7,7 +7,7 @@
 
 $_Q_Validators = [
 	// mandatory is a special rule
-	"mandatory" => ["!empty(\$value)", "<b>\$property</b> is mandatory"],
+	"mandatory" => ["(!empty(\$value) || (\$value === \"0\"))", "<b>\$property</b> is mandatory"],
 	"required" => ["!empty(\$value)", "\$value is required", "This field is required!"],
 	"boolean" => ["(is_bool(\$value) !== true)", "\$property needs to be boolean!", "\$property needs to be boolean!"],
 	"true" => ["\$value", "\$value must evaluate to true"],
