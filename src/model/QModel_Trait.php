@@ -1434,7 +1434,8 @@ trait QModel_Trait
 								{
 									if (!$prop_inf["#"])
 									{
-										qvardump($k, $v);
+										if (\QAutoload::GetDevelopmentMode())
+											qvardumpk($k, $v, $prop_inf, $type_inf);
 										throw new \Exception("Expected type cannot be identified!");
 									}
 									$expected_type = "\\".reset($prop_inf["#"]);
