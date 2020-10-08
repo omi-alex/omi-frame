@@ -1651,11 +1651,15 @@ class QApi
 			// $login_identity->populate('*,User.{*, Context.*, Owner.*},Session.*');
 			// serialize and deserialize to break references
 			
-			list($class_name, $method) = explode("::", $class_method, 2);
-			
-			//qvardump("\$remote_user", \Omi\User::GetCurrentUser(), $remote_user, $class_name, $method, $arguments);
-
-			$result = call_user_func_array([$class_name, $method], $arguments);
+			if (is_callable($class_method))
+			{
+				$result = $class_method(...$arguments);
+			}
+			else
+			{
+				list($class_name, $method) = explode("::", $class_method, 2);
+				$result = call_user_func_array([$class_name, $method], $arguments);
+			}
 			
 			static::$_LastCalledPartner = $partner;
 		}
