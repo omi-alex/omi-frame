@@ -728,6 +728,10 @@ class QMySqlStorage extends QSqlStorage
 				{
 					return "BLOB";
 				}
+			case QSqlTableColumn::TypeLongBlob:
+				{
+					return "LONGBLOB";
+				}
 			case QSqlTableColumn::TypeEnum:
 				{
 					return "ENUM";
@@ -914,6 +918,10 @@ class QMySqlStorage extends QSqlStorage
 			case "BLOB":
 			{
 				return QSqlTableColumn::TypeBlob;
+			}
+			case "LONGBLOB":
+			{
+				return QSqlTableColumn::TypeLongBlob;
 			}
 			case "ENUM":
 			{
