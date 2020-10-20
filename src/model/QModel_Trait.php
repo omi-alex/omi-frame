@@ -2,6 +2,59 @@
 
 trait QModel_Trait
 {
+	/**
+	 * Transforms the object into a PHP array. 
+	 * The selector is mandatory.
+	 * 
+	 * @return array
+	 */
+	public function exportToArray($selector, $with_type = false, $with_hidden_ids = false, $ignore_nulls = true)
+	{
+		if (is_string($selector))
+			$selector = qParseEntity($selector);
+		
+		$arr = [];
+		if ($with_type)
+			$arr['_ty'] = get_class($this);
+		
+		foreach ($selector ?: [] as $selector_k => $selector_v)
+		{
+			$val = $this->{$selector_k};
+			$ty = gettype($val);
+			
+			switch ($ty)
+			{
+				case "string":
+				case "array":
+				case "integer":
+				case "double":
+				case "boolean":
+				{
+					$arr[$selector_k] = $val;
+					break;
+				}
+				case "NULL":
+				{
+					if (!$ignore_nulls)
+						$arr[$selector_k] = null;
+					break;
+				}
+				case "object":
+				{
+					if ($val instanceof QIModel)
+						$arr[$selector_k] = $val->exportToArray($selector_v, $with_type, $with_hidden_ids, $ignore_nulls);
+					else
+						$arr[$selector_k] = (array)$val;
+				}
+				default:
+					continue;
+			}
+
+		}
+		
+		return $arr;
+	}
+	
 	public static function ExportDataToFlatCsv_deprecated($data, string $selector = null, $destination = null, bool $start = true, string $delimiter = ',', string $enclosure = '"', string $escape_char = '\\')
 	{
 		// for testing only

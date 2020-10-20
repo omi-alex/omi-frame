@@ -2157,4 +2157,53 @@ class QModelArray extends ArrayObject implements QIModelArray
 		return $clone;
 	}
 	
+	/**
+	 * Transforms the object into a PHP array. 
+	 * The selector is mandatory.
+	 * 
+	 * @return array
+	 */
+	public function exportToArray($selector, $with_type = false, $with_hidden_ids = false, $ignore_nulls = true)
+	{
+		if (is_string($selector))
+			$selector = qParseEntity($selector);
+		
+		$arr = [];
+		if ($with_type)
+			$arr['_ty'] = get_class($this);
+		
+		foreach ($this as $k => $val)
+		{
+			$ty = gettype($val);
+			switch ($ty)
+			{
+				case "string":
+				case "array":
+				case "integer":
+				case "double":
+				case "boolean":
+				{
+					$arr[$k] = $val;
+					break;
+				}
+				case "NULL":
+				{
+					if (!$ignore_nulls)
+						$arr[$k] = null;
+					break;
+				}
+				case "object":
+				{
+					if ($val instanceof QIModel)
+						$arr[$k] = $val->exportToArray($selector, $with_type, $with_hidden_ids, $ignore_nulls);
+					else
+						$arr[$k] = (array)$val;
+				}
+				default:
+					continue;
+			}
+		}
+		
+		return $arr;
+	}
 }
