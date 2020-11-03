@@ -1269,6 +1269,9 @@ final class QAutoload
 	{
 		self::$DevelopmentMode = true;
 		
+		file_put_contents("temp_log_dev_mode.txt", 
+				date("Y-m-d H:i:s")." - " . $_SERVER["HTTP_X_FORWARDED_FOR"] . " : " .$_SERVER["REMOTE_ADDR"] . "\n" , FILE_APPEND);
+		
 		if (!$ajax_mode)
 		{
 			try
