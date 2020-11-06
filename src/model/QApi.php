@@ -2443,19 +2443,6 @@ class QApi
 			while ($subparts_list);
 		}
 		
-		/*if ($data->Users) # debug dump only !
-		{
-			foreach ($data->getModelType()->properties as $prop_name => $prop_def)
-			{
-				if (($prop_name === 'Id') || ($prop_name === 'Del__'))
-					continue;
-				
-				if ($data->$prop_name instanceof \QIModel)
-					qvar_dumpk($data->$prop_name);
-			}
-			die;
-		}*/
-		
 		$saved_context = null;
 		try
 		{
