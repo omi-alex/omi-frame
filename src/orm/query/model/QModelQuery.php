@@ -147,6 +147,10 @@ class QModelQuery
 			throw new \Exception('q_lock_queries');
 		
 		$run_query = self::PrepareBindQuery($query, $binds);
+		
+		if (defined('Q_QQuery_Debug_SQL') && Q_QQuery_Debug_SQL)
+			qvar_dumpk($run_query);
+		
 		$result = self::Query($run_query, $from, $dataBlock, $skip_security, $binds, $query, $filter_selector, $populate_only, $storage);
 		if ($dataBlock)
 		{
