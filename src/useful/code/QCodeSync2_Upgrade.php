@@ -8,9 +8,9 @@ trait QCodeSync2_Upgrade
 	protected $upgrage_dir;
 	protected $upgrade_inside_dir;
 
-	public function run_upgrade(array &$files, array $changed_or_added, array $removed_files, array $new_files)
+	public function run_upgrade(array $files, array $changed_or_added, array $removed_files, array $new_files)
 	{
-	    $this->upgrade_inside_dir = getcwd()."/";
+		$this->upgrade_inside_dir = getcwd()."/";
 		$this->upgrage_dir = dirname(getcwd())."/".basename(getcwd())."@upgrade/";
 		$this->temp_code_dir = $this->upgrage_dir."temp/code/";
 		
@@ -470,5 +470,49 @@ trait QCodeSync2_Upgrade
 			copy($layer.$file, $upgrade_path);
 		
 		touch($upgrade_path, filemtime($layer.$file));
+	}
+	
+	function upgrade_backend_fix(array &$files, array &$changed_or_added)
+	{
+		$backend_full_path = realpath(QGEN_SaveDirBase);
+		if (is_dir($backend_full_path))
+		{
+			$backend_full_path = $backend_full_path."/";
+			
+			$backend_existing_files = scandir($backend_full_path);
+			foreach ($backend_existing_files as $lv_view)
+			{
+				if (($lv_view === '.') || ($lv_view === '..'))
+					continue;
+				
+				if (!is_dir($backend_full_path.$lv_view.'/'))
+					continue;
+
+				$possible_class_path = $backend_full_path.$lv_view.'/'.$lv_view.'.class.php';
+				$should_not_be_there_path = $backend_full_path.$lv_view.'/'.$lv_view.'.php';
+				if (file_exists($should_not_be_there_path))
+					throw new \Exception('Please remove legacy generated Grid/backend PHP files.');
+
+				if (!file_exists($possible_class_path))
+				{
+					file_put_contents($possible_class_path, "<?php
+
+namespace Omi\\VF\\View;
+
+/**
+ * @class.name {$lv_view}
+ */
+class {$lv_view}_backend_ extends \\Omi\\View\\Grid 
+{
+	
+}
+
+");
+					$file_m_time = filemtime($possible_class_path);
+					$files[$backend_full_path][$lv_view.'/'.$lv_view.'.class.php'] = $file_m_time;
+					$changed_or_added[$backend_full_path][$lv_view.'/'.$lv_view.'.class.php'] = $file_m_time;
+				}
+			}
+		}
 	}
 }

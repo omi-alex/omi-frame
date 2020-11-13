@@ -5,8 +5,10 @@
  */
 trait QCodeSync2_Utility
 {
-	public function check_syntax(string $layer, array $layer_files, array &$lint_info = null)
+	public function check_syntax(string $layer, array $layer_files, array &$lint_info = null, bool $is_full_sync = false)
 	{
+		$t0 = microtime(true);
+		
 		$lint_batch_size = 32; // we start 32 processes at once!
 		$lint_cache_path = $this->temp_code_dir."php_lint_cache.php";
 		
@@ -16,15 +18,15 @@ trait QCodeSync2_Utility
 			if (file_exists($lint_cache_path))
 			{
 				$_DATA = [];
-				include($lint_cache_path);
+				require($lint_cache_path);
 				$lint_info = $_DATA;
 			}
-			if (!$lint_info)
+			if ($lint_info === null)
 				// ensure it's at least an empty array
 				$lint_info = [];
 		}
 		
-		# Determine what files needs checking again (either modified or never checked
+		# Determine what files needs checking again (either modified or never checked)
 		{
 			$not_checked_files = [];
 			foreach ($layer_files as $file => $mtime)
@@ -38,19 +40,24 @@ trait QCodeSync2_Utility
 				if ((!isset($lint_mdate_size)) || ($lint_mdate_size !== [$mtime, filesize($layer.$file)]))
 					$not_checked_files[$file] = $mtime;
 			}
+			
 			# remove no longer needed files from the cache
 			$update_cache = false;
-			$unset_files = [];
-			foreach ($lint_info[$layer] ?: [] as $file => $lint_mdate_size)
+			
+			if ($is_full_sync)
 			{
-				if (!isset($layer_files[$file]))
+				$unset_files = [];
+				foreach ($lint_info[$layer] ?: [] as $file => $lint_mdate_size)
 				{
-					$unset_files[] = $file;
-					$update_cache = true;
+					if (!isset($layer_files[$file]))
+					{
+						$unset_files[] = $file;
+						$update_cache = true;
+					}
 				}
+				foreach ($unset_files as $unsetf)
+					unset($lint_info[$layer][$unsetf]);
 			}
-			foreach ($unset_files as $unsetf)
-				unset($lint_info[$layer][$unsetf]);
 		}
 		
 		for ($i = 0; $i < ceil(count($not_checked_files)/$lint_batch_size); $i++)
@@ -61,6 +68,7 @@ trait QCodeSync2_Utility
 			{
 				// save before we throw errors
 				file_put_contents($lint_cache_path, "<?php\n\n\$_DATA = ".var_export($lint_info, true).";");
+				opcache_invalidate($lint_cache_path);
 				
 				qvar_dumpk($errors);
 				throw new \Exception('Syntax errors');
@@ -72,17 +80,26 @@ trait QCodeSync2_Utility
 				foreach ($lint_files as $lf_path => $lf_mdate)
 					$lint_info[$layer][$lf_path] = [$lf_mdate, filesize($layer.$lf_path)];
 				file_put_contents($lint_cache_path, "<?php\n\n\$_DATA = ".var_export($lint_info, true).";");
+				opcache_invalidate($lint_cache_path);
 				// we no longer need to update
 				$update_cache = false;
 			}
 		}
 		
 		if ($update_cache)
+		{
 			file_put_contents($lint_cache_path, "<?php\n\n\$_DATA = ".var_export($lint_info, true).";");
+			opcache_invalidate($lint_cache_path);
+			echo "LINT TOOK: ", ((microtime(true) - $t0)*1000)." ms<br/>\n";
+		}
 	}
 	
 	public function lint_batch(array $files, string $folder = null)
 	{
+		echo "lint_batch :: @{$folder}<br/>\n";
+		foreach ($files ?: [] as $f)
+			echo "------ {$f}<br/>\n";
+		
 		$procs = [];
 		$all_pipes = [];
 		$descriptorspec = [
@@ -152,6 +169,8 @@ trait QCodeSync2_Utility
 				$ret[$f] = ['proc_ret' => $ret_codes[$i], 'error' => $errors[$i], 'open_stat' => $process_stats[$i]];
 			$i++;
 		}
+		
+		echo "END lint_batch :: @{$folder}<br/>\n";
 		
 		return $ret;
 	}
@@ -223,35 +242,52 @@ trait QCodeSync2_Utility
 		return $to_str;
 	}
 
-	public function check_if_class_extends(string $class, $namespace, string $extends, array $info_by_class, string $class_extends = null)
+	public function check_if_class_extends(string $class, string $extends, string $class_extends, array $extends_map)
 	{
 		if (!$class_extends)
-			$class_extends = $namespace ? \QPHPToken::ApplyNamespaceToName($info_by_class[$class]['extends'], $namespace) : $info_by_class[$class]['extends'];
+			$class_extends = $extends_map[$class];
 		if (!$class_extends)
-		{
-			// echo "Class `{$class}` - NO!<br/>\n";
 			return false;
-		}
 		
 		$loops = 0;
 		$max_loops = 64;
 		while ($class_extends)
 		{
 			if ($class_extends === $extends)
-			{
 				// echo "Class `{$class}` - YES!<br/>\n";
 				return true;
-			}
 			else
-				$class_extends = $info_by_class[$class_extends]['extends'] ? ($namespace ? \QPHPToken::ApplyNamespaceToName($info_by_class[$class_extends]['extends'], $namespace) : $info_by_class[$class_extends]['extends']) : null;
+				$class_extends = $extends_map[$class_extends];
+			
 			$loops++;
 			if ($loops > $max_loops)
 			{
-				qvar_dumpk('$class, $namespace, $extends, $info_by_class, $class_extends', $class, $namespace, $extends, $info_by_class, $class_extends);
+				qvar_dumpk('$class, $extends, $class_extends, $extends_map', $class, $extends, $class_extends, $extends_map);
 				throw new \Exception('Recursive lookup');
 			}
 		}
 		// echo "Class `{$class}` - NO!<br/>\n";
 		return false;
+	}
+	
+	function print_info_by_class(array $data, callable $filter_classes = null, callable $filter_files = null)
+	{
+		echo "<pre>";
+		foreach ($data ?: [] as $class => $info)
+		{
+			if ((!$filter_classes) || $filter_classes($class, $info))
+			{
+				echo "<b>{$class} (class)</b>\n";
+				foreach ($info['files'] ?: [] as $layer_tag => $layer_files)
+				{
+					echo "\t{$layer_tag} (layer: ".$this->tags_to_watch_folders[$layer_tag].")\n";
+					foreach ($layer_files ?: [] as $file_tag => $header_inf)
+					{
+						echo "\t\t{$file_tag}\n";
+					}
+				}
+			}
+		}
+		echo "</pre>";
 	}
 }

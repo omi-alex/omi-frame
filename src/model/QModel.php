@@ -1886,9 +1886,10 @@ class QModel implements QIModel
 							$arr[$prop] = $val->toArray($data, $include_nonmodel_properties, $with_type, $with_hidden_ids, $ignore_nulls, $refs, $refs_no_class);
 						else
 							$arr[$prop] = (array)$val;
+						break;
 					}
 					default:
-						continue;
+						break;
 				}
 
 				if ($all_keys)

@@ -11,6 +11,9 @@ tests/
 *.min.js
 *.min.css
 
+~gens/
+~gens/**
+
 #OS junk files
 [Tt]humbs.db
 *.DS_Store
@@ -21,9 +24,6 @@ tests/
 /modules/**
 
 src/view/js/mvvm.js
-
-~gens/
-~gens/**
 
 src/useful/dev-mode/
 src/useful/dev-mode/**

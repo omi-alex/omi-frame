@@ -1,5 +1,3 @@
-# omi-frame
-Omibit Framework
+# frame-runtime
 
-Please see: http://www.omiframe.com
-
+The framework's runtime

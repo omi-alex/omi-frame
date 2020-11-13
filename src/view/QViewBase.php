@@ -264,6 +264,24 @@ class QViewBase extends QModel
 		self::IncludeResourcesForClass($class ?: get_class($this));
 	}
 	
+	public static function IncludeResourcesForClass_new(array $resources = null)
+	{
+		if ($resources === null)
+			$resources = static::_get_Tpl_Compiled_Res();
+		
+		foreach ($resources ?: [] as $r_type => $r_list)
+		{
+			foreach ($r_list ?: [] as $res_data)
+			{
+				$web_path = \QApp::GetWebPath($res_data['layer_path'].$res_data['file']);
+				if ($r_type === 'js')
+					self::$IncludeJs[$web_path] = $web_path;
+				else if ($r_type === 'css')
+					self::$IncludeCss[$web_path] = $web_path;
+			}
+		}
+	}
+	
 	public static function IncludeResourcesForClass($class = null)
 	{
 		$class = $class ?: get_called_class();
@@ -337,6 +355,8 @@ class QViewBase extends QModel
 	
 	public static function GetResourcesForClass($class = null)
 	{
+		throw new \Exception('GetResourcesForClass used ?!');
+		
 		$class = $class ?: get_called_class();
 		$data = array();
 		$data_css = array();
@@ -605,5 +625,10 @@ class QViewBase extends QModel
 				$ctrl->init(true);
 			return $ctrl->$method(...$args);
 		}
+	}
+	
+	protected function _get_Tpl_Compiled_Res()
+	{
+		return [];
 	}
 }

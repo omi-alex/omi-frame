@@ -230,5 +230,133 @@ trait QCodeSync2_Old
 				
 		unset($class_struct);
 	}
+
+	
+	function sync_code__group_by_full_class_name()
+	{
+		$this->extends_map = [];
+		$has_changes = $this->full_sync ? true : false;
+		
+		qvar_dumpk('$this->changes_by_class', $this->changes_by_class);
+		die;
+		
+		$last_layer = null;
+		foreach ($this->grouped_data as $gd_layer => $gd_dirs)
+		{
+			foreach ($gd_dirs as $gd_dir_name => $gd_classes_list)
+			{
+				foreach ($gd_classes_list as $gd_class_short => $gd_class_files)
+				{
+					// sort by (1.php, 2.url, 3.tpl) to get the best info
+					ksort($gd_class_files);
+					
+					$namespace = null;
+					$class = null;
+					$extends = null;
+					$implements = null;
+					
+					$has_tpl = null;
+					$has_url = null;
+					$is_patch = null;
+					$locations = [];
+					$has_php = null;
+					
+					$resources = [];
+					
+					foreach ($gd_class_files as $gd_file_name => &$header_inf)
+					{
+						$was_added = $header_inf['added'];
+						$was_removed = $header_inf['removed'];
+						
+						if ($was_removed)
+							throw new \Exception('@TODO - $was_removed');
+						
+						if ($header_inf['namespace'] && ((!$namespace) || ($namespace === $header_inf['namespace'])))
+							$namespace = $header_inf['namespace'];
+						// else if ($header_inf['namespace'] && ($header_inf['namespace'] !== $namespace))
+						//	throw new \Exception('Namespace mistmatching '.$gd_layer.$gd_dir_name.$gd_file_name);
+						
+						if ($header_inf['final_class'] && ((!$class) || ($class === $header_inf['final_class'])))
+							$class = $header_inf['final_class'];
+						else if ($header_inf['final_class'] && ($header_inf['final_class'] !== $class))
+							throw new \Exception('Class mistmatching '.$gd_layer.$gd_dir_name.$gd_file_name);
+						
+						if ($header_inf['extends'] && ((!$extends) || ($extends === $header_inf['extends'])))
+							$extends = $header_inf['extends'];
+						//else if ($header_inf['extends'] && ($header_inf['extends'] !== $extends))
+						//	throw new \Exception('Extends mistmatching '.$gd_layer.$gd_dir_name.$gd_file_name);
+						
+						if ($header_inf['implements'] && ((!$implements) || ($implements === $header_inf['implements'])))
+							$implements = $header_inf['implements'];
+						//else if ($header_inf['implements'] && ($header_inf['implements'] !== $implements))
+						//	throw new \Exception('Implements mistmatching '.$gd_layer.$gd_dir_name.$gd_file_name);
+						if ($header_inf['is_php'])
+							$has_php = true;
+					}
+					
+					// test if it extends
+					$full_class_name = \QPHPToken::ApplyNamespaceToName($class, $namespace);
+
+					# if no extends is present up to this layer for a TPL, we make sure it will at least extend `QWebControl`
+					if ((!$extends) && $has_tpl && ((!$is_patch) || $has_php) && (!$this->info_by_class[$full_class_name]['extends']))
+					{
+						$extends_full = $extends = 'QWebControl';
+						foreach ($gd_class_files as $gd_file_name => &$header_inf)
+							$header_inf['extends'] = $header_inf['namespace'] ? '\\QWebControl' : 'QWebControl';
+					}
+					else
+					{
+						$extends_full = $extends ? \QPHPToken::ApplyNamespaceToName($extends, $namespace) : null;
+					}
+					
+					if ($extends)
+					{
+						$this->extends_map[$full_class_name] = $extends_full;
+						if (!$this->info_by_class[$full_class_name]['extends'])
+							$this->info_by_class[$full_class_name]['extends'] = $extends_full;
+					}
+
+					foreach ($gd_class_files as $gd_file_name => &$header_inf)
+					{
+						// we must ensure proper namespace to all info!
+						if ($namespace && (!$header_inf['namespace']))
+							$header_inf['namespace'] = $namespace;
+						$header_inf['class_full'] = \QPHPToken::ApplyNamespaceToName($header_inf['class'], $namespace);
+						if ($extends_full)
+							$header_inf['extends_full'] = $extends_full;
+							
+						$locations[$header_inf['file']] = $header_inf;
+						
+						if ($extends_full && ($class !== $header_inf['class']))
+							$this->extends_map[$header_inf['class_full']] = $extends_full;
+						
+						if ($header_inf['type'] === 'resource')
+							$this->info_by_class[$full_class_name]['res'][$header_inf['res_type']][] = $header_inf;
+					}
+					
+					if ($has_tpl)
+						$this->info_by_class[$full_class_name]['has_tpl'] = true;
+					if ($has_url)
+						$this->info_by_class[$full_class_name]['has_url'] = true;
+					if ($is_patch)
+						$this->info_by_class[$full_class_name]['is_patch'] = true;
+					foreach ($locations as $loc => $h_info)
+					{
+						if (isset($this->info_by_class[$full_class_name]['files'][$this->watch_folders_tags[$gd_layer]][$h_info['tag']]))
+						{
+							qvar_dumpk($full_class_name, $gd_layer, $h_info['tag']);
+							throw new \Exception('This should not duplicate');
+						}
+						$this->info_by_class[$full_class_name]['files'][$this->watch_folders_tags[$gd_layer]][$h_info['tag']] = $h_info;
+					}
+				}
+			}
+		
+			$last_layer = $gd_layer;
+		}
+		
+		if ($has_changes)
+			file_put_contents($this->temp_code_dir."sync_cache_grouped_data.php", "<?php\n\n\$_DATA = ".var_export($this->grouped_data, true).";\n");
+	}
 	
 }

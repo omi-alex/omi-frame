@@ -2410,6 +2410,7 @@ abstract class QPHPToken
 		{
 			// $tokens = qtoken_get_all(file_get_contents($path));
 			$readonly_tokens = $tokens = QPHPToken::GetPHPTokensFromFile($path);
+			
 			$file_without_php = "";
 			
 			$has_opener = false;
@@ -2443,7 +2444,10 @@ abstract class QPHPToken
 						"/ius", $file_without_php, $matches);
 
 					if (!$stat)
+					{
+						# qvar_dumpk($tokens);
 						throw new Exception("Parse error");
+					}
 					
 					$has_opener = false;
 					$has_closer = false;
