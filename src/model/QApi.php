@@ -2103,14 +2103,16 @@ class QApi
 		return static::ImportData($data, $import_config);
 	}
 	
-	public static function ImportCsvData_Parse(string $file, array $config, array $import_config)
+	public static function ImportCsvData_Parse(string $file, array $config, array $import_config, \Omi\App $data = null)
 	{
 		if (!is_file($file))
 			throw new \Exception("`{$file}` is not a file!");
 
 		try
 		{
-			$data = \QApp::NewData();
+			if ($data === null)
+				$data = \QApp::NewData();
+			
 			echo "About to import from: ".$file." [".(is_file($file) ? 'ok' : 'not-found')."] <br/>\n";
 			
 			if (is_array($config["headings"]))

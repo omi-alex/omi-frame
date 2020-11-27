@@ -3987,6 +3987,7 @@ class QModel implements QIModel
 						else
 							$str .= "{$pp_comma}\"{$prop}\":".json_encode($val, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 						$pp_comma = ",";
+						break;
 					}
 					default:
 						break;
