@@ -1013,7 +1013,7 @@ final class QAutoload
 	 * @param boolean $recursive
 	 * @param boolean $use_compiled_if_exists
 	 */
-	private static function IncludeClassesInFolder($folder, $recursive = false, $use_compiled_if_exists = true)
+	public static function IncludeClassesInFolder($folder, $recursive = false, $use_compiled_if_exists = true)
 	{
 		$items = scandir($folder);
 		foreach ($items as $item)

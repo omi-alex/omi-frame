@@ -26,28 +26,65 @@ class QModelQuery
 	 */
 	public static function Query($query, $from = null, &$dataBlock = null, $skip_security = true, $binds = null, $initial_query = null, $filter_selector = null, $populate_only = false, \QIStorage $storage = null)
 	{
-		if (is_string($filter_selector))
-			$filter_selector = qParseEntity($filter_selector);
-		// Execute the query
-		if ($storage === null)
-			$storage = QApp::GetStorage();
-		$conn = $storage->connection;
-
-		if ($dataBlock === null)
-			$dataBlock = array();
-
-		if (($from instanceof QIModelArray) || is_array($from))
+		\QTrace::Begin_Trace(
+					[$query, $from, $binds, $skip_security, $initial_query, $populate_only], ["query"]);
+		
+		try
 		{
-			// handle query on an array
-			$saved_from = $from;
-			list($from_blocks, $sql_items) = self::CreateModelBlocks($from, $dataBlock, $storage);
-			if (empty($sql_items))
-				return $sql_items;
-			
-			foreach ($from_blocks as $_from)
+			if (is_string($filter_selector))
+				$filter_selector = qParseEntity($filter_selector);
+			// Execute the query
+			if ($storage === null)
+				$storage = QApp::GetStorage();
+			$conn = $storage->connection;
+
+			if ($dataBlock === null)
+				$dataBlock = array();
+
+			if (($from instanceof QIModelArray) || is_array($from))
 			{
+				// handle query on an array
+				$saved_from = $from;
+				list($from_blocks, $sql_items) = self::CreateModelBlocks($from, $dataBlock, $storage);
+				if (empty($sql_items))
+					return $sql_items;
+
+				foreach ($from_blocks as $_from)
+				{
+					// Build the query 
+					list($main_q, $frm_arr, $from) = self::QueryToStructInner($query, $_from, $skip_security, $sql_items[$_from], $filter_selector, $storage);
+
+					$main_q->_dbg_query = ($initial_query && ($initial_query !== $query)) ? array($initial_query, $query) : $query;
+					$main_q->_dbg_binds = $binds;
+
+					$main_q->storage = $storage;
+
+					if (QAutoload::$DebugPanel)
+						QDebug::AddQuery($main_q->_dbg_query, $from, $binds, $dataBlock ? true : false, $skip_security);
+
+					$main_q->query($dataBlock, $storage, $conn, $frm_arr, $populate_only);
+
+					/*if ((!$skip_security) && QModel::$SecurityCheckQueriedData && $dataBlock)
+					{
+						//$user = QUser::GetCurrent();
+						//QModel::SecurityCheck($from, null, null, $user, QPermsFlagRead, $dataBlock);
+					}*/
+				}
+
+				if ($main_q->query_type === "INSERT")
+				{
+					$mysqli = $storage->connection;
+					return $mysqli->insert_id;
+				}
+
+
+				return $saved_from;
+			}
+			else
+			{
+				// query as before for one instance
 				// Build the query 
-				list($main_q, $frm_arr, $from) = self::QueryToStructInner($query, $_from, $skip_security, $sql_items[$_from], $filter_selector, $storage);
+				list($main_q, $frm_arr, $from) = self::QueryToStructInner($query, $from, $skip_security, null, $filter_selector, $storage);
 
 				$main_q->_dbg_query = ($initial_query && ($initial_query !== $query)) ? array($initial_query, $query) : $query;
 				$main_q->_dbg_binds = $binds;
@@ -56,56 +93,29 @@ class QModelQuery
 
 				if (QAutoload::$DebugPanel)
 					QDebug::AddQuery($main_q->_dbg_query, $from, $binds, $dataBlock ? true : false, $skip_security);
-				
+
 				$main_q->query($dataBlock, $storage, $conn, $frm_arr, $populate_only);
 
-				/*if ((!$skip_security) && QModel::$SecurityCheckQueriedData && $dataBlock)
+				/*
+				if ((!$skip_security) && QModel::$SecurityCheckQueriedData && $dataBlock)
 				{
 					//$user = QUser::GetCurrent();
 					//QModel::SecurityCheck($from, null, null, $user, QPermsFlagRead, $dataBlock);
-				}*/
-			}
-			
-			if ($main_q->query_type === "INSERT")
-			{
-				$mysqli = $storage->connection;
-				return $mysqli->insert_id;
-			}
+				}
+				*/
 
-		
-			return $saved_from;
+				if ($main_q->query_type === "INSERT")
+				{
+					$mysqli = $storage->connection;
+					return $mysqli->insert_id;
+				}
+
+				return $from;
+			}
 		}
-		else
+		finally
 		{
-			// query as before for one instance
-			// Build the query 
-			list($main_q, $frm_arr, $from) = self::QueryToStructInner($query, $from, $skip_security, null, $filter_selector, $storage);
-			
-			$main_q->_dbg_query = ($initial_query && ($initial_query !== $query)) ? array($initial_query, $query) : $query;
-			$main_q->_dbg_binds = $binds;
-
-			$main_q->storage = $storage;
-
-			if (QAutoload::$DebugPanel)
-				QDebug::AddQuery($main_q->_dbg_query, $from, $binds, $dataBlock ? true : false, $skip_security);
-
-			$main_q->query($dataBlock, $storage, $conn, $frm_arr, $populate_only);
-
-			/*
-			if ((!$skip_security) && QModel::$SecurityCheckQueriedData && $dataBlock)
-			{
-				//$user = QUser::GetCurrent();
-				//QModel::SecurityCheck($from, null, null, $user, QPermsFlagRead, $dataBlock);
-			}
-			*/
-			
-			if ($main_q->query_type === "INSERT")
-			{
-				$mysqli = $storage->connection;
-				return $mysqli->insert_id;
-			}
-
-			return $from;
+			\QTrace::End_Trace(['return' => $from]);
 		}
 	}
 	
@@ -143,27 +153,44 @@ class QModelQuery
 	
 	public static function BindQuery($query, $binds, $from = null, &$dataBlock = null, $skip_security = true, $filter_selector = null, $populate_only = false, \QIStorage $storage = null)
 	{
-		if (defined('q_lock_queries') && q_lock_queries)
-			throw new \Exception('q_lock_queries');
-		
-		$run_query = self::PrepareBindQuery($query, $binds);
-		
-		if (defined('Q_QQuery_Debug_SQL') && Q_QQuery_Debug_SQL)
-			qvar_dumpk($run_query);
-		
-		$result = self::Query($run_query, $from, $dataBlock, $skip_security, $binds, $query, $filter_selector, $populate_only, $storage);
-		if ($dataBlock)
+		/*if (strpos($query, 'Services_Instances') !== false)
 		{
-			foreach ($dataBlock as $objs)
+			qvar_dumpk($query, $binds);
+			\QSqlParserQuery::$_DebugOn = 1;
+		}*/
+		
+		\QTrace::Begin_Trace(func_get_args(), ["query"]);
+		
+		try
+		{
+			if (defined('q_lock_queries') && q_lock_queries)
+				throw new \Exception('q_lock_queries');
+
+			$run_query = self::PrepareBindQuery($query, $binds);
+
+			if (defined('Q_QQuery_Debug_SQL') && Q_QQuery_Debug_SQL)
+				qvar_dumpk($run_query);
+
+			$result = self::Query($run_query, $from, $dataBlock, $skip_security, $binds, $query, $filter_selector, $populate_only, $storage);
+			if ($dataBlock)
 			{
-				if ($objs)
+				foreach ($dataBlock as $objs)
 				{
-					foreach ($objs as $obj)
-						$obj->init(false);
+					if ($objs)
+					{
+						foreach ($objs as $obj)
+							$obj->init(false);
+					}
 				}
 			}
+			return $result;
 		}
-		return $result;
+		finally
+		{
+			// \QSqlParserQuery::$_DebugOn = 0;
+
+			\QTrace::End_Trace();
+		}
 	}
 	
 	/**

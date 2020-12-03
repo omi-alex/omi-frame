@@ -95,3 +95,16 @@ set_error_handler(array("QErrorHandler", "HandleError"), E_ALL & ~(E_NOTICE | E_
 set_exception_handler(array("QErrorHandler", "UncaughtExceptionHandler"));
 register_shutdown_function(array("QErrorHandler", "OnShutdown"));
 
+if (defined('Q_DEBUG_API_KEY') && (strlen(Q_DEBUG_API_KEY) >= 40) && (isset($_GET[Q_DEBUG_API_KEY]) || isset($_POST[Q_DEBUG_API_KEY])))
+{
+	require_once(__DIR__."/base/QTrace.php");
+	\QAutoload::IncludeClassesInFolder(Q_FRAME_PATH."debug/", true);
+	\QDebugPanel::Run();
+	# done without error
+	exit(0);
+}
+else
+{
+	require_once(__DIR__."/base/QTrace.php");
+	\QTrace::Run(true);
+}
