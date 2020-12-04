@@ -439,7 +439,7 @@ class QSqlParserQuery
 		
 		$root_q = $this->getRootQuery();
 		
-		\QTrace::Begin_Trace([$exe_q], ["query", "sql"]);
+		\QTrace::Begin_Trace([], [$exe_q], ["query", "sql"]);
 		try
 		{
 			$t1 = microtime(true);
@@ -450,7 +450,7 @@ class QSqlParserQuery
 		}
 		finally
 		{
-			\QTrace::End_Trace([$result ? true : false, $t2 - $t1], ["query", "sql"]);
+			\QTrace::End_Trace([], [$result ? true : false, $t2 - $t1], ["query", "sql"]);
 		}
 		
 		if (($t2 - $t1) >= 30) # slow query log

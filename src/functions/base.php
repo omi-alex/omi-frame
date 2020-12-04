@@ -1180,6 +1180,15 @@ function qvar_dumpk()
 	return $ret;
 }
 
+function qvar_get()
+{
+	ob_start();
+	$ret = "";
+	foreach (func_get_args() as $arg)
+		$ret .= qDebugStackInner($arg, false, false);
+	return ob_get_clean();
+}
+
 /**
  * Better var_dump for objects/model
  * 

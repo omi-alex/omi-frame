@@ -108,6 +108,7 @@ class QApp extends QAppModule
 			\QWebRequest::HandleShutdown(ob_get_clean());
 		});
 		static::$QWebRequest_HandleShutdown_Registered = true;
+		
 		ob_start();
 		
 		if ($dev_mode && 
@@ -120,6 +121,7 @@ class QApp extends QAppModule
 		else if ($controllers)
 		{
 			$one_controller = (!is_array($controllers)) ? $controllers : ((!next($controllers)) ? reset($controllers) : null);
+		
 			if ($one_controller)
 			{
 				self::$UrlController = $one_controller;

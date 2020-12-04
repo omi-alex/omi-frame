@@ -109,196 +109,226 @@ class QWebRequest
 	 */
 	public static function frame_Process($App = "QApp", QIUrlController $controller = null, $skip_url = null)
 	{
-		static::$RequestId = uniqid();
-		// audit request
-		\QAudit::AuditRequest();
-		
-		self::$AjaxRequest = self::IsAjaxRequest();
-		self::$FastAjax = $fast_call = ($_POST["__qFastAjax__"] || $_GET["__qFastAjax__"]);
-		
-		// disabled atm
-		if (false && (Q_DEBUG || Q_DEV) && (!static::$AjaxRequest) && (!self::$FastAjax))
+		try
 		{
-			// @TODO - JS must ensure that the parent iframe is in dev mode
+			static::$RequestId = uniqid();
+			self::$AjaxRequest = self::IsAjaxRequest();
+			self::$FastAjax = $fast_call = ($_POST["__qFastAjax__"] || $_GET["__qFastAjax__"]);
 			
-			$with_ifr = rtrim(Q_APP_REL ,'/').'/~dev';
-			$with_ifr_len = strlen($with_ifr);
-			$last_ch = $_SERVER['REQUEST_URI']{$with_ifr_len};
-			$has_iframe_tag = (substr($_SERVER['REQUEST_URI'], 0, $with_ifr_len) === $with_ifr) && (($last_ch === '') || ($last_ch === '?') || ($last_ch === '/') || ($last_ch === '&'));
-			
-			if (!$has_iframe_tag)
-			{
-				$with_ifr_dev = rtrim(Q_APP_REL ,'/').'/__q_dev__';
-				$with_ifr_dev_len = strlen($with_ifr_dev);
-				$last_ch_dev = $_SERVER['REQUEST_URI']{$with_ifr_dev_len};
-				$has_iframe_dev_tag = (substr($_SERVER['REQUEST_URI'], 0, $with_ifr_dev_len) === $with_ifr_dev) && (($last_ch_dev === '') || ($last_ch_dev === '?') || ($last_ch_dev === '/') || ($last_ch_dev === '&'));
-			}
-			
-			// @TODO ... switch to ~dev based on some seesion var ? or other ... make sure the parent is on dev mode!
-			if ($has_iframe_tag)
-			{
-				// return the iframe
-				static::RenderDevIframe('__q_dev__');
-				// we must stop here
-				die;
-			}
-			else if ($has_iframe_dev_tag)
-			{
-				/// for ($i = 0; $i < 100; $i++)
-				static::RenderDevIframe_Dev('__q_dev__');
-				die;
-			}
-			// else continue normal
-		}
+			\QTrace::Begin_Trace([],
+					['static::$RequestId' => static::$RequestId, 'self::$FastAjax' => self::$FastAjax, '$_GET["__or__"]' => $_GET["__or__"], '$_SERVER' => $_SERVER], ["request"]);
 		
-		// detect the type of the request
-		// Content-Type: application/soap+xml; charset=utf-8
-		if ($_GET["__or__"] || ($_GET["__or__"] !== null))
-		{
-			// var_dump($_GET["__or__"]);
-			$qs = $_SERVER["QUERY_STRING"];
-			$matches = null;
-			//preg_match("/__or__\\=(.*?)(?:\\&|\$)/us", $qs, $matches);
-			preg_match("/(?:^|\\&|\\?)__or__\\=(.*?)(?:\\&|\$)/us", $qs, $matches);
-			// remove __q_noiframe__ if exists !
-			if ($matches[1])
-				$matches[1] = preg_replace('/(?:^|\&)__q_noiframe__\b\/?/us', '', $matches[1]);
-			self::$OriginalRequest = urldecode($matches[1]);
-			unset($_GET["__or__"]);
-		}
-		
-		if ($_GET["__MultiResponseId"])
-		{
-			static::$MultiRequestId = (string)$_GET["__MultiResponseId"];
-			unset($_GET["__MultiResponseId"]);
-		}
-		
-		self::$BaseHref = BASE_HREF;
-		if ($skip_url)
-		{
-			self::$OriginalRequest = substr(self::$OriginalRequest, strlen($skip_url));
-			if (self::$OriginalRequest === false)
-				self::$OriginalRequest = "";
-			self::$BaseHref .= rtrim($skip_url, "/")."/";
-		}
-			
-		self::$RequestProtocol = $_SERVER["SERVER_PROTOCOL"];
-		if (($tmp_p = strpos(self::$RequestProtocol, "/")) !== false)
-			self::$RequestProtocol = substr(self::$RequestProtocol, 0, $tmp_p);
-		self::$SSLEnabled = isset($_SERVER["HTTPS"]) && (strtolower($_SERVER["HTTPS"]) != "off");
-		self::$AjaxRequest = self::IsAjaxRequest();
-		$IframeWorkaround = ($_POST["__qIframe__"]) || ($_GET["__qIframe__"]);
-		
-		if ($_GET["__customExtract__"] || $_POST["__customExtract__"])
-			self::$ArrayInItems = false;
-		
-		/*
-		if ($_POST)
-		{
-			file_put_contents("dump.".date("Y-m-d H:i:s", time()).".json", json_encode($_POST));
-		}
-		*/
-	   $managed = false;
+			// audit request
+			\QAudit::AuditRequest();
 
-		// we need to convert the raw request into one or more manageble callbacks
-		$compare_or = trim(self::$OriginalRequest);
-		$compare_or = (substr($compare_or, -1, 1) === '/') ? $compare_or : $compare_or.'/';
+			// disabled atm
+			if (false && (Q_DEBUG || Q_DEV) && (!static::$AjaxRequest) && (!self::$FastAjax))
+			{
+				// @TODO - JS must ensure that the parent iframe is in dev mode
 
-		if (substr($compare_or, 0, strlen(self::$REST_API_URL)) == self::$REST_API_URL)
-		{
-			self::$RequestProtocol = "REST";
-			// TO DO : if ($request_controller_script) include($request_controller_script);
-			// REST request
-			// throw new Exception("REST request :: TO DO");
-			static::HandleRESTFul(substr($compare_or, strlen(self::$REST_API_URL)));
-		}
-		else if (substr($compare_or, 0, strlen(self::$REST_API_URL_NEW)) == self::$REST_API_URL_NEW)
-		{
-			self::$RequestProtocol = "REST";
-			static::HandleRESTFul(substr($compare_or, strlen(self::$REST_API_URL_NEW)));
-		}
-		else if (substr(self::$OriginalRequest, 0, strlen(self::$SOAP_API_URL)) == self::$SOAP_API_URL)
-		{
-			self::$RequestProtocol = "SOAP";
-			
-			// TO DO : if ($request_controller_script) include($request_controller_script);
-			// SOAP request
-			// load up SOAP server / and so on
-			throw new Exception("SOAP request :: TO DO");
-		}
-		else 
-		{
-			self::$RequestProtocol = "HTTP";
-			
-			$url = QUrl::$Requested = new QUrl(self::$OriginalRequest);
-			
-			if ($_GET['_deploy_'])
-			{
-				if (!QAutoload::GetDevelopmentMode())
+				$with_ifr = rtrim(Q_APP_REL ,'/').'/~dev';
+				$with_ifr_len = strlen($with_ifr);
+				$last_ch = $_SERVER['REQUEST_URI']{$with_ifr_len};
+				$has_iframe_tag = (substr($_SERVER['REQUEST_URI'], 0, $with_ifr_len) === $with_ifr) && (($last_ch === '') || ($last_ch === '?') || ($last_ch === '/') || ($last_ch === '&'));
+
+				if (!$has_iframe_tag)
 				{
-					http_response_code('403');
-					echo 'HTTP/1.1 403 Forbidden';
+					$with_ifr_dev = rtrim(Q_APP_REL ,'/').'/__q_dev__';
+					$with_ifr_dev_len = strlen($with_ifr_dev);
+					$last_ch_dev = $_SERVER['REQUEST_URI']{$with_ifr_dev_len};
+					$has_iframe_dev_tag = (substr($_SERVER['REQUEST_URI'], 0, $with_ifr_dev_len) === $with_ifr_dev) && (($last_ch_dev === '') || ($last_ch_dev === '?') || ($last_ch_dev === '/') || ($last_ch_dev === '&'));
 				}
-				else
+
+				// @TODO ... switch to ~dev based on some seesion var ? or other ... make sure the parent is on dev mode!
+				if ($has_iframe_tag)
 				{
-					$managed = QDeploy::Run();
+					// return the iframe
+					static::RenderDevIframe('__q_dev__');
+					// we must stop here
+					die;
 				}
+				else if ($has_iframe_dev_tag)
+				{
+					/// for ($i = 0; $i < 100; $i++)
+					static::RenderDevIframe_Dev('__q_dev__');
+					die;
+				}
+				// else continue normal
 			}
-			// URL managed or not
-			else if ($fast_call)
+
+			// detect the type of the request
+			// Content-Type: application/soap+xml; charset=utf-8
+			if ($_GET["__or__"] || ($_GET["__or__"] !== null))
 			{
-				if ($controller)
-					$managed = is_string($controller) ? $controller::initController($url) : $controller->initController($url);
-				else
-					$managed = $App::initController($url);
-				// execute the fast call : qbMethod="fast-ajax"
-				execQB();
+				// var_dump($_GET["__or__"]);
+				$qs = $_SERVER["QUERY_STRING"];
+				$matches = null;
+				//preg_match("/__or__\\=(.*?)(?:\\&|\$)/us", $qs, $matches);
+				preg_match("/(?:^|\\&|\\?)__or__\\=(.*?)(?:\\&|\$)/us", $qs, $matches);
+				// remove __q_noiframe__ if exists !
+				if ($matches[1])
+					$matches[1] = preg_replace('/(?:^|\&)__q_noiframe__\b\/?/us', '', $matches[1]);
+				self::$OriginalRequest = urldecode($matches[1]);
+				unset($_GET["__or__"]);
+			}
+
+			if ($_GET["__MultiResponseId"])
+			{
+				static::$MultiRequestId = (string)$_GET["__MultiResponseId"];
+				unset($_GET["__MultiResponseId"]);
+			}
+
+			self::$BaseHref = BASE_HREF;
+			if ($skip_url)
+			{
+				self::$OriginalRequest = substr(self::$OriginalRequest, strlen($skip_url));
+				if (self::$OriginalRequest === false)
+					self::$OriginalRequest = "";
+				self::$BaseHref .= rtrim($skip_url, "/")."/";
+			}
+
+			self::$RequestProtocol = $_SERVER["SERVER_PROTOCOL"];
+			if (($tmp_p = strpos(self::$RequestProtocol, "/")) !== false)
+				self::$RequestProtocol = substr(self::$RequestProtocol, 0, $tmp_p);
+			self::$SSLEnabled = isset($_SERVER["HTTPS"]) && (strtolower($_SERVER["HTTPS"]) != "off");
+			self::$AjaxRequest = self::IsAjaxRequest();
+			$IframeWorkaround = ($_POST["__qIframe__"]) || ($_GET["__qIframe__"]);
+
+			if ($_GET["__customExtract__"] || $_POST["__customExtract__"])
+				self::$ArrayInItems = false;
+
+			/*
+			if ($_POST)
+			{
+				file_put_contents("dump.".date("Y-m-d H:i:s", time()).".json", json_encode($_POST));
+			}
+			*/
+		   $managed = false;
+
+			// we need to convert the raw request into one or more manageble callbacks
+			$compare_or = trim(self::$OriginalRequest);
+			$compare_or = (substr($compare_or, -1, 1) === '/') ? $compare_or : $compare_or.'/';
+
+			if (substr($compare_or, 0, strlen(self::$REST_API_URL)) == self::$REST_API_URL)
+			{
+				self::$RequestProtocol = "REST";
+				// TO DO : if ($request_controller_script) include($request_controller_script);
+				// REST request
+				// throw new Exception("REST request :: TO DO");
+				static::HandleRESTFul(substr($compare_or, strlen(self::$REST_API_URL)));
+			}
+			else if (substr($compare_or, 0, strlen(self::$REST_API_URL_NEW)) == self::$REST_API_URL_NEW)
+			{
+				self::$RequestProtocol = "REST";
+				static::HandleRESTFul(substr($compare_or, strlen(self::$REST_API_URL_NEW)));
+			}
+			else if (substr(self::$OriginalRequest, 0, strlen(self::$SOAP_API_URL)) == self::$SOAP_API_URL)
+			{
+				self::$RequestProtocol = "SOAP";
+
+				// TO DO : if ($request_controller_script) include($request_controller_script);
+				// SOAP request
+				// load up SOAP server / and so on
+				throw new Exception("SOAP request :: TO DO");
 			}
 			else 
 			{
-				ob_start();
-				if ($controller)
-					$managed = is_string($controller) ? $controller::loadFromUrl($url) : $controller->loadFromUrl($url);
-				else
-					$managed = $App::loadFromUrl($url);
-				static::$ControllerOutput = ob_get_clean();
-			}
+				self::$RequestProtocol = "HTTP";
 
-			if ((!$managed) && (!$fast_call))
-			{
-				// call for a 404 management
-				// The URL manager must translate the path
-				if (!headers_sent())
+				$url = QUrl::$Requested = new QUrl(self::$OriginalRequest);
+
+				if ($_GET['_deploy_'])
 				{
-					header("HTTP/1.1 404 Not Found");
-					header("Status: 404 Not Found");
-					die("HTTP/1.1 404 Not Found");
+					if (!QAutoload::GetDevelopmentMode())
+					{
+						http_response_code('403');
+						echo 'HTTP/1.1 403 Forbidden';
+					}
+					else
+					{
+						$managed = QDeploy::Run();
+					}
+				}
+				// URL managed or not
+				else if ($fast_call)
+				{
+					\QTrace::Begin_Trace([],
+						['execQB' => true, '$fast_call' => $fast_call, '$controller' => is_string($controller) ? $controller : get_class($controller) ,
+								], ["request", "fast-call"]);
+					try
+					{
+						if ($controller)
+							$managed = is_string($controller) ? $controller::initController($url) : $controller->initController($url);
+						else
+							$managed = $App::initController($url);
+						// execute the fast call : qbMethod="fast-ajax"
+						execQB();
+					}
+					finally
+					{
+						\QTrace::End_Trace();
+					}
+				}
+				else 
+				{
+					\QTrace::Begin_Trace([],
+						['$controller' => is_string($controller) ? $controller : get_class($controller) ,
+								], ["request", "fast-call"]);
+					try
+					{
+						ob_start();
+						if ($controller)
+							$managed = is_string($controller) ? $controller::loadFromUrl($url) : $controller->loadFromUrl($url);
+						else
+							$managed = $App::loadFromUrl($url);
+						static::$ControllerOutput = ob_get_clean();
+					}
+					finally
+					{
+						\QTrace::End_Trace();
+					}
+				}
+
+				if ((!$managed) && (!$fast_call))
+				{
+					// call for a 404 management
+					// The URL manager must translate the path
+					if (!headers_sent())
+					{
+						header("HTTP/1.1 404 Not Found");
+						header("Status: 404 Not Found");
+						die("HTTP/1.1 404 Not Found");
+					}
 				}
 			}
-		}
-		
-		if (self::$AjaxRequest || self::$FastAjax)
-		{
-			if ($IframeWorkaround)
+
+			if (self::$AjaxRequest || self::$FastAjax)
 			{
-				echo "<!doctype html>\n<html>\n<head>\n<title>Iframe</title>\n</head>\n<body>\n<textarea>";
-				ob_start();
+				if ($IframeWorkaround)
+				{
+					echo "<!doctype html>\n<html>\n<head>\n<title>Iframe</title>\n</head>\n<body>\n<textarea>";
+					ob_start();
+				}
+				self::SendAjaxResponse();
+				if ($IframeWorkaround)
+				{
+					$out = ob_get_clean();
+					echo htmlspecialchars($out);
+					echo "</textarea>\n</body>\n</html>";
+				}
 			}
-			self::SendAjaxResponse();
-			if ($IframeWorkaround)
+			else
 			{
-				$out = ob_get_clean();
-				echo htmlspecialchars($out);
-				echo "</textarea>\n</body>\n</html>";
+				echo static::$ControllerOutput;
+				static::$ControllerOutputSent = true;
 			}
+
+			return $managed;
 		}
-		else
+		finally
 		{
-			echo static::$ControllerOutput;
-			static::$ControllerOutputSent = true;
+			\QTrace::End_Trace([], ['return' => $managed]);
 		}
-		
-		return $managed;
 	}
 
 	/**

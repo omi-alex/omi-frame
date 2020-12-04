@@ -2,6 +2,22 @@
 
 trait QModel_Trait
 {
+	public static function Get_Data_Model_Caption($data)
+	{
+		if (($data instanceof \QModelArray) || (is_array($data)))
+		{
+			$captions = [];
+			foreach ($data as $d)
+				$captions[] = static::Get_Data_Model_Caption($d);
+			
+			return implode("; ", $captions);
+		}
+		else if ($data instanceof \QModel)
+			return $data->getModelCaption();
+		else if (is_scalar($data))
+			return (string)$data;
+	}
+	
 	/**
 	 * Transforms the object into a PHP array. 
 	 * The selector is mandatory.

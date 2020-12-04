@@ -7,6 +7,8 @@ final class QTrace
 {
 	const Keep_Active_After = (60 * 10); # 10 minutes after the last ->touch()
 	
+	const FLUSH_EVERY_X_SEC = 1.25; // in sec
+	
 	/**
 	 * @var QTrace
 	 */
@@ -26,6 +28,8 @@ final class QTrace
 	protected $file_index;
 	protected $file_list;
 	protected $file_data;
+	
+	protected $last_flush;
 	
 	public function touch()
 	{
@@ -66,24 +70,24 @@ final class QTrace
 			# do the tracing
 			$this->root_node = $this->begin_tr(["server" => $_SERVER], ["request"]);
 			
-			// ob_start();
+			$ref_to_this = $this;
 			
-			register_shutdown_function(function ()
+			register_shutdown_function(function () use ($ref_to_this)
 			{
 				// $out = ob_get_clean();
 				// $this->dump();
 				// qvar_dumpk("done !!!");
 				// echo $out;
 				// force it at the correct position
-				$this->node = $this->root_node;
-				$this->end_tr();
+				$ref_to_this->node = $ref_to_this->root_node;
+				$ref_to_this->end_tr();
 				
-				if ($this->file_index)
-					fclose($this->file_index);
-				if ($this->file_list)
-					fclose($this->file_list);
-				if ($this->file_data)
-					fclose($this->file_data);
+				if ($ref_to_this->file_index)
+					fclose($ref_to_this->file_index);
+				if ($ref_to_this->file_list)
+					fclose($ref_to_this->file_list);
+				if ($ref_to_this->file_data)
+					fclose($ref_to_this->file_data);
 			});
 		}
 	}
@@ -110,10 +114,19 @@ final class QTrace
 		$this->file_data  = fopen($path.".data" , "w");
 		if (!$this->file_data)
 			throw new \Exception('Unable to start data file');
+		
+		$this->last_flush = microtime(true);
 	}
 	
 	public static function Extract_Array($params, int $max_depth = 4)
 	{
+		if (($params instanceof \QModel) || ($params instanceof \QModelArray))
+		{
+			# exportToArray($selector, $with_type = false, $with_hidden_ids = false, $ignore_nulls = true)
+			# toJSON($selector = null, $include_nonmodel_properties = false, $with_type = true, $with_hidden_ids = true, $ignore_nulls = true, &$refs = null, &$refs_no_class = null)
+			# public function toArray($selector = null, $include_nonmodel_properties = false, $with_type = true, $with_hidden_ids = true, $ignore_nulls = true, &$refs = null, &$refs_no_class = null)
+			return $params->toArray(null, false, true, true, true);
+		}
 		// @TODO - use proper selector, use objects storage to avoid duplicates, 
 			// mark duplicates and have some kind of references for it
 			// other optimizations !!!
@@ -153,80 +166,104 @@ final class QTrace
 			return null;
 	}
 	
-	protected function trace_internal(int $id, int $parent_id = null, array $data = null, array $tags = null, bool $is_start = false, 
+	protected function trace_internal(int $id, int $parent_id = null, array $config = null, array $data = null, array $tags = null, bool $is_start = false, 
 											bool $is_end = false, array $debug_backtrace = null)
 	{
+		$do_flush = (microtime(true) - ($this->last_flush ?: 0) >= static::FLUSH_EVERY_X_SEC);
+		if ($do_flush)
+			$this->last_flush = microtime(true);
 		//  ftell ( resource $handle ) : int
 		# handle list
 		{
 			$skip_qtrace = true;
-			$caption = "";
+			$caption = null;
 			$line = null;
 			$file = null;
 			$path = null;
+			
+			# $cfg_calledin = $config['@calledin'] ? true : false;
+			$called_in = [];
+			if (isset($config['caption']))
+				$caption = $config['caption'];
+			
 			foreach ($debug_backtrace ?: [] as $trace)
 			{
 				if ($skip_qtrace && ($trace['class'] === 'QTrace')) // && ($trace['file'] === __FILE__)
 					continue;
-				$skip_qtrace = false;
 				
+				$skip_qtrace = false;
 				$rel_path = qrelative_path($trace['file'], Q_RUNNING_PATH);
 				
-				$caption = ($trace['class'] ? $trace['class'].$trace['type'] : ""). $trace['function'];
-				$line = $trace['line'];
-				$path = $rel_path;
-				break;
+				if ($caption === null)
+				{
+					$caption = ($trace['class'] ? $trace['class'].$trace['type'] : ""). $trace['function'];
+					if ($caption === null)
+						$caption = "";
+				}
+				
+				# called in
+				$called_in[] = [$rel_path, $trace['class'], $trace['type'], $trace['function'], $trace['line']];
+				if (count($called_in) >= 3)
+					break;
 			}
 			
-			$list_data = [$caption, $tags, $line, $path];
+			$list_data = [$caption, $tags, $called_in];
 			
 			$list_write = json_encode($list_data)."\n";
 			$list_start = ftell($this->file_list);
 			$list_witten = fwrite($this->file_list, $list_write);
-			# @TODO - maybe not flush that often (once/s)
-			fflush($this->file_list);
+			
+			if ($do_flush)
+				fflush($this->file_list);
 		}
 		
 		# handle data 
 		{
 			$data_data = [$debug_backtrace, static::Extract_Array($data)];
 			
+			# if (($data['$return'] instanceof \QModelArray) && (reset($data['$return']) instanceof \Omi\Genband\SBC\Endpoint))
+			{
+				// qvar_dumpk($data, static::Extract_Array($data));
+			}
+			
 			$data_write = json_encode($data_data)."\n";
 			$data_start = ftell($this->file_data);
 			$data_witten = fwrite($this->file_data, $data_write);
-			fflush($this->file_data);
+			if ($do_flush)
+				fflush($this->file_data);
 		}
 		
 		# handle index
 		{
 			# id,parent,start,end,list_start,list_end,data_start,data_end
 			fputcsv($this->file_index, [$id, $parent_id ?: 0, $is_start, $is_end, $list_start, $list_witten, $data_start, $data_witten]);
-			fflush($this->file_index);
+			if ($do_flush)
+				fflush($this->file_index);
 		}
 	}
 	
-	public static function Add_Trace(array $data = null, array $tags = null)
+	public static function Add_Trace(array $config = null, array $data = null, array $tags = null)
 	{
 		if (static::$Default)
 		{
-			static::$Default->begin_tr($data, $tags);
-			static::$Default->end_tr($data, $tags);
+			static::$Default->begin_tr($config, $data, $tags);
+			static::$Default->end_tr($config, $data, $tags);
 		}
 	}
 	
-	public static function Begin_Trace(array $data = null, array $tags = null)
+	public static function Begin_Trace(array $config = null, array $data = null, array $tags = null)
 	{
 		if (static::$Default)
-			static::$Default->begin_tr($data, $tags);
+			static::$Default->begin_tr($config, $data, $tags);
 	}
 	
-	public static function End_Trace(array $data = null, array $tags = null)
+	public static function End_Trace(array $config = null, array $data = null, array $tags = null)
 	{
 		if (static::$Default)
-			static::$Default->end_tr($data, $tags);
+			static::$Default->end_tr($config, $data, $tags);
 	}
 	
-	protected function begin_tr(array $data = null, array $tags = null)
+	protected function begin_tr(array $config = null, array $data = null, array $tags = null)
 	{
 		$new_node = new \QTrace_Node();
 		$new_node->id = ++$this->last_id;
@@ -234,21 +271,21 @@ final class QTrace
 		
 		$this->node = $new_node;
 		
-		$this->trace_internal($this->node->id, isset($this->node->parent->id) ? $this->node->parent->id : 0, $data, $tags, true, false, 
+		$this->trace_internal($this->node->id, isset($this->node->parent->id) ? $this->node->parent->id : 0, $config, $data, $tags, true, false, 
 				debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 8) );
 		
 		return $new_node;
 	}
 	
-	protected function end_tr(array $data = null, array $tags = null)
+	protected function end_tr(array $config = null, array $data = null, array $tags = null)
 	{
-		$this->trace_internal($this->node->id, isset($this->node->parent->id) ? $this->node->parent->id : 0, $data, $tags, false, true);
+		$this->trace_internal($this->node->id, isset($this->node->parent->id) ? $this->node->parent->id : 0, $config, $data, $tags, false, true);
 		$this->node = $this->node ? $this->node->parent : null;
 	}
 	
 	public function dump()
 	{
-		qvar_dumpk($this->node);
+		# qvar_dumpk($this->node);
 	}
 	
 	public static function Run(bool $trace_request = false)
@@ -370,11 +407,12 @@ final class QTrace
 			// $list_start, $list_witten, $data_start, $data_witten
 			if ($is_start)
 			{
-				list ($caption, $tags, $line, $path) = json_decode(substr($list_f, $list_start, $list_witten));
+				list ($caption, $tags, $called_in) = json_decode(substr($list_f, $list_start, $list_witten));
 				$node->caption = $caption;
 				$node->tags = $tags;
-				$node->line = $line;
-				$node->path = $path;
+				# $node->line = $line;
+				# $node->path = $path;
+				$node->called_in = $called_in;
 			}
 			
 			if ($with_data)

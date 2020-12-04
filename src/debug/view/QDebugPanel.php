@@ -29,14 +29,22 @@ class QDebugPanel
 			$pad = ($depth * 40);
 			echo "<tr>";
 			echo "<td style='padding-left: {$pad}px;'>{$node->caption}</td>";
-			echo "<td>{$node->line} ./{$node->path}</td>";
+			echo "<td class='big'><a class='qdbg fas fa-route' href='javascript://'> </a><div class='scrollable'>".
+					htmlspecialchars( qvar_get($node->trace) )."</div>";
+			echo " <a class='qdbg fas fa-database' href='javascript://'> </a><div class='scrollable'>".
+					htmlspecialchars( qvar_get($node->data) )."</div>";
+			echo " <a class='qdbg fas fa-check' href='javascript://'> </a><div class='scrollable'>".
+					htmlspecialchars( qvar_get($node->data_end) )."</div>";
+			// echo "<td>{$node->line} ./{$node->path}</td>";
+			foreach ($node->called_in as $called_in)
+			{
+				# [$rel_path, $trace['class'], $trace['type'], $trace['function'], $trace['line']]
+				list ($rel_path, $trace_class, $trace_type, $trace_func, $trace_line) = $called_in;
+				$hidden = "<i class='q-dots'>...</i><span style='display: none'>line: {$trace_line} @ {$rel_path}</span>";
+				echo "<td>".
+						($trace_class ? ($trace_class.$trace_type) : '').$trace_func." ".$hidden."</td>";
+			}
 			echo "<td class='tags'><div class='scrollable'>".htmlspecialchars( implode(", ", $node->tags) )."</div></td>";
-			echo "<td class='big'><a class='qdbg' href='javascript://'>trace</a><div class='scrollable'>".
-					htmlspecialchars( json_encode($node->trace, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) )."</div></td>";
-			echo "<td class='big'><a class='qdbg' href='javascript://'>data</a><div class='scrollable'>".
-					htmlspecialchars( json_encode($node->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) )."</div></td>";
-			echo "<td class='big'><a class='qdbg' href='javascript://'>end data</a><div class='scrollable'>".
-					htmlspecialchars( json_encode($node->data_end, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) )."</div></td>";
 			echo "</tr>";
 			
 			if ($node->children)

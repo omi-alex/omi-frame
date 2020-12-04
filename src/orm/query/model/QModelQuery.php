@@ -26,8 +26,8 @@ class QModelQuery
 	 */
 	public static function Query($query, $from = null, &$dataBlock = null, $skip_security = true, $binds = null, $initial_query = null, $filter_selector = null, $populate_only = false, \QIStorage $storage = null)
 	{
-		\QTrace::Begin_Trace(
-					[$query, $from, $binds, $skip_security, $initial_query, $populate_only], ["query"]);
+		\QTrace::Begin_Trace([],
+					[$query, $binds, $skip_security, $populate_only], ["query"]);
 		
 		try
 		{
@@ -115,7 +115,7 @@ class QModelQuery
 		}
 		finally
 		{
-			\QTrace::End_Trace(['return' => $from]);
+			\QTrace::End_Trace([], ['return' => $from]);
 		}
 	}
 	
@@ -159,7 +159,7 @@ class QModelQuery
 			\QSqlParserQuery::$_DebugOn = 1;
 		}*/
 		
-		\QTrace::Begin_Trace(func_get_args(), ["query"]);
+		\QTrace::Begin_Trace(["caption" => "Query: ".substr($query, 0, 24)], ['$query' => $query, '$binds' => $binds, '$populate_only' => $populate_only], ["query"]);
 		
 		try
 		{

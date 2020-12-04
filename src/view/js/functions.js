@@ -1164,7 +1164,7 @@ function printDump(dump)
 		// class='qHideOnClickAway '
 		panel = jQuery(document.body).append("<div id='qb-dump-panel' style='z-index: 100000; max-width: 90%; position: fixed; top: 0px; right: 0px; display: block; overflow: scroll; height: 100%; background-color: white; border: 1px solid gray; padding: 10px; margin: 0px;' >" + 
 					"<a onclick='jQuery(this).parent().remove();' style='position: absolute; right: 5px; top: 3px; cursor: pointer; color: red;'>x</a>" + 
-					"<a onclick='jQuery(this).next().empty(); jQuery(this).parent().hide();' style='position: absolute; right: 35px; top: 3px; cursor: pointer; color: blue;'>clear</a>" +
+					"<a onclick='jQuery(this).parent().find(\"\\> pre, \\> hr\").remove(); jQuery(this).parent().hide();' style='position: absolute; right: 35px; top: 3px; cursor: pointer; color: blue;'>clear</a>" +
 					"</div>");
 		panel = jQuery("#qb-dump-panel");
 	}

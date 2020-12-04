@@ -141,6 +141,7 @@ class QApi
 			$current_user_is_customer = $current_user->Customer ? true : false;
 			
 			# \Omi\Comm\Reseller::SetupParentChildrenChain();
+			$current_owner = \Omi\App::GetCurrentOwner();
 			
 			$possible_support_emails = [];
 			if ($current_user->Customer)
@@ -151,12 +152,14 @@ class QApi
 			else
 			{
 				$customers_tree = \QQuery("CustomersTree.{SupportEmail WHERE SupportEmail IS NOT NULL AND LENGTH(SupportEmail) > 0 AND Owner.ParentsStack.Id=? GROUP BY Id}", 
-											[$current_user->Owner->Id])->CustomersTree;
+											[$current_owner->Id])->CustomersTree;
 				
 				foreach ($customers_tree ?: [] as $customer)
 				{
 					$possible_support_emails[$customer->Id] = $customer->SupportEmail;
 				}
+				
+				# qvar_dumpk($customers_tree, $possible_support_emails);
 			}
 			
 			foreach ($fd_ret ?: [] as $fd_r)
@@ -177,7 +180,7 @@ class QApi
 				$r->Status = $fd_r['status'] ? ($status_array[$fd_r['status']] ?: $fd_r['status']) : 'n/a';
 				$r->Priority = $fd_r['priority'] ? ($status_array[$fd_r['priority']] ?: $fd_r['priority']) : 'n/a';
 				
-				if ($current_user_is_customer || ($top_level_owner->Id != $current_user->Owner->Id))
+				if ($current_user_is_customer || ($top_level_owner->Id != $current_owner->Id))
 				{
 					if (!$r->Email)
 					{

@@ -10,6 +10,8 @@
 		<title>Debug Panel</title>
 		<base href="<?= BASE_HREF ?>" />
 		
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" />
+		
 		<style type="text/css">
 			
 			table td {
@@ -23,7 +25,7 @@
 				font-size: 12px;
 				min-width: 400px;
 				box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
-				table-layout: fixed;
+				/* table-layout: fixed; */
 				width: 100%;
 			}
 			
@@ -61,11 +63,11 @@
 			}
 			
 			.styled-table td.big {
-				width: 100px;
+				
 			}
 			
 			.styled-table td.tags {
-				width: 100px;
+				
 			}
 			
 			div.scrollable {
@@ -78,6 +80,11 @@
 				display: none;
 			}
 			
+			.q-dots {
+				color: gray;
+				cursor: pointer;
+			}
+			
 		</style>
 		
 		<script type="text/javascript">
@@ -86,7 +93,15 @@
 				if (($dom.tagName === 'A') && $dom.classList.contains('qdbg'))
 				{
 					// alert($dom.tagName);
-					var $div = $dom.closest('td').querySelector('div');
+					var $div = $dom.nextElementSibling;
+					qvar_dump($div.innerText);
+				}
+				else if (($dom.tagName === 'I') && $dom.classList.contains('q-dots'))
+				{
+					// alert($dom.tagName);
+					var $div = $dom.nextElementSibling;
+					// alert($div.innerText);
+					// $div.style.display = 'inline-block';
 					alert($div.innerText);
 				}
 			});
@@ -129,6 +144,13 @@
 				echo "</ul>";
 			}
 		?>
+	
+	<script type="text/javascript" src="<?= Q_FRAME_REL; ?>view/js/functions.js"></script>
+	<script
+			  src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+			  integrity="sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs="
+			  crossorigin="anonymous"></script>
 	</body>
+	
 </html>
 
