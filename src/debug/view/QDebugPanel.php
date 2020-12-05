@@ -19,6 +19,8 @@ class QDebugPanel
 		$this->trace->init();
 		$this->trace->touch();
 		
+		$this->trace->cleanup();
+		
 		include(__DIR__."/q_debug_panel.tpl");
 	}
 	

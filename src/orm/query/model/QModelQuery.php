@@ -1349,7 +1349,9 @@ class QModelQuery
 										$coll_q->cols[$table_as]["{$table_as}.{$join_tab_ty}"] = $join_tab_ty;
 
 									foreach ($j_types as $j_ty)
-										$types_join_inf[$j_ty] = array($j_table, $table_as, $join_tab_id, $join_tab_ty);
+									{
+										$joins[$join_key][$j_ty] = $types_join_inf[$j_ty] = array($j_table, $table_as, $join_tab_id, $join_tab_ty);	
+									}
 								}
 							}
 						}
@@ -1375,7 +1377,17 @@ class QModelQuery
 								}
 								else
 								{
-									list ($j_table, $table_as, $join_tab_id, $join_tab_ty) = $types_join_inf[$mngd_ty];
+									$tji_tmp = $types_join_inf[$mngd_ty];
+									if (!$tji_tmp)
+									{
+										$join_key = $coll_as."/{$c_prop}/".$j_table;
+										$tji_tmp = $joins[$join_key][$mngd_ty];
+										# if (\QAutoload::GetDevelopmentMode())
+										#	qvar_dumpk('$joins', $joins[$join_key][$mngd_ty]);
+										if (!$tji_tmp)
+											throw new \Exception('Missing join info');
+									}
+									list ($j_table, $table_as, $join_tab_id, $join_tab_ty) = $tji_tmp;
 								}
 
 								if ($pure_sel)
@@ -1411,7 +1423,7 @@ class QModelQuery
 										$ty_model->as = $ty_model->ps_as;
 
 									if (!($ty_model->ps_as && $ty_model->table && $ty_model->ps_query))
-										throw new Exception("Not ok 2");
+										throw new Exception("Not ok 2 a");
 								}
 								else
 								{
@@ -1430,7 +1442,7 @@ class QModelQuery
 									{
 										if (\QAutoload::GetDevelopmentMode())
 											var_dump($one_to_many, $coll_as, $collection_tab);
-										throw new Exception("Not ok 2");
+										throw new Exception("Not ok 2 b");
 									}
 								}
 

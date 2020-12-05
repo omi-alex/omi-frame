@@ -110,18 +110,19 @@ trait QModel_Common_View
 		foreach ($src_from_types as $src_type)
 		{
 			$mi = \QModel::GetTypeByName($src_type);
-
+			
 			$prop = $mi->properties[$k];
 			if (!$prop)
 				continue;
-
+			
 			$prop_display = $prop->display;
 			$ty_arr = is_array($prop->types) ? $prop->types : [$prop->types];
 			$prop_storage = is_array($prop->storage) ? $prop->storage : [$prop->storage];
+						
+			$prop_cfg = is_array($prop->cfg) ? $prop->cfg : (($prop->cfg !== null) ? [$prop->cfg] : []);
 			$prop_validation = $force_validation ?: ($prop->validation ? $prop->validation : null);
 			$prop_fix = $force_fix ?: ($prop->fixValue ? $prop->fixValue : null);
 
-			
 			$caption = $prop->name;
 			if ($propAlias)
 			{
@@ -227,7 +228,10 @@ trait QModel_Common_View
 			$r_types["validation_alert"]	= $alert;
 			$r_types["validation_info"]		= $info;
 			$r_types['prop_caption']		= $prop_caption;
-
+			
+			// $prop_cfg = is_array($prop->cfg) ? $prop->cfg : [$prop->cfg];
+			$r_types['cfg']					= $prop_cfg;
+			
 			// setup mixed data on property
 			$prop->_mixed_data = $r_types;
 		}

@@ -164,7 +164,7 @@ class QCodeStorage
 			
 			$parse_data = $this::parseDocComment($method->getDocComment());
 			
-			if ($parse_data["api"] || $parse_data["security"] || $parse_data["storage"])
+			if ($parse_data["api"] || $parse_data["security"] || $parse_data["storage"] || $parse_data["cfg"])
 			{
 				$model_meth = new QModelMethod();
 				$model_meth->static = $method->isStatic();
@@ -254,6 +254,18 @@ class QCodeStorage
 				}
 				else
 					$returned_data["storage"][$key] = (strlen($value) == 0) ? true : $value;
+			}
+			else if ((substr($type, 0, 4) === "cfg.") || ($type === "cfg"))
+			{
+				$key = ($type === "cfg") ? null : substr($type, 4);
+				$value = trim($value, "\n\r\t =");
+				if (!isset($returned_data["cfg"]))
+					$returned_data["cfg"] = array();
+				
+				if ($key !== null)
+					$returned_data["cfg"][$key] = (strlen($value) == 0) ? true : $value;
+				else
+					$returned_data["cfg"] = (strlen($value) == 0) ? true : $value;
 			}
 			else if (substr($type, 0, 4) == "api.")
 			{
@@ -650,6 +662,19 @@ class QCodeStorage
 						$returned_data["storage"][$key] = (strlen($value) == 0) ? true : $value;
 					$append_in_last = false;
 				}
+				else if ((substr($type, 0, 4) === "cfg.") || ($type === "cfg"))
+				{
+					$key = ($type === "cfg") ? null : substr($type, 4);
+					$value = trim($value, "\n\r\t =");
+					if (!isset($returned_data["cfg"]))
+						$returned_data["cfg"] = array();
+
+					if ($key !== null)
+						$returned_data["cfg"][$key] = (strlen($value) == 0) ? true : $value;
+					else
+						$returned_data["cfg"] = (strlen($value) == 0) ? true : $value;
+					$append_in_last = false;
+				}
 				else if (substr($type, 0, 4) === "api.")
 				{
 					$key = substr($type, 4);
@@ -1022,6 +1047,7 @@ class QCodeStorage
 /* (($type->rights !== null) ? ("\$_qtmp->rights = ".($type->rights ? qArrayToCode($type->rights, null, false, null, 1) : "null").";\n") : "").*/
 (($type->security !== null) ? ("\$_qtmp->security = ".($type->security ? qArrayToCode($type->security, null, false, null, 1) : "null").";\n") : "").
 (($type->storage !== null) ? ("\$_qtmp->storage = ".($type->storage ? qArrayToCode($type->storage, null, false, null, 1) : "null").";\n") : "").
+(($type->cfg !== null) ? ("\$_qtmp->cfg = ".($type->cfg ? qArrayToCode($type->cfg, null, false, null, 1) : "null").";\n") : "").
 (($type->entity !== null) ? ("\$_qtmp->entity = ".($type->entity ? qArrayToCode($type->entity, null, false, null, 1) : "null").";\n") : "").
 (($type->model !== null) ? ("\$_qtmp->model = ".($type->model ? qArrayToCode($type->model, null, false, null, 1) : "null").";\n") : "").
 (($type->api !== null) ? ("\$_qtmp->api = ".($type->api ? qArrayToCode($type->api, null, false, null, 1) : "null").";\n") : "").
@@ -1042,6 +1068,7 @@ class QCodeStorage
 (($prop->default !== null) ? ("\$_qtprop->default = ".(is_array($prop->default) ? qArrayToCode($prop->default, null, false, null, 1) : json_encode($prop->default)).";\n") : "").
 (($prop->comment !== null) ? ("\$_qtprop->comment = ".json_encode($prop->comment).";\n") : "").
 (($prop->storage !== null) ? ("\$_qtprop->storage = ".($prop->storage ? qArrayToCode($prop->storage, null, false, null, 1) : "null").";\n") : "").
+(($prop->cfg !== null) ? ("\$_qtprop->cfg = ".($prop->cfg ? qArrayToCode($prop->cfg, null, false, null, 1) : "null").";\n") : "").
 (($prop->display !== null) ? ("\$_qtprop->display = ".($prop->display ? qArrayToCode($prop->display, null, false, null, 1) : "null").";\n") : "").
 (($prop->getter !== null) ? ("\$_qtprop->getter = ".json_encode($prop->getter).";\n") : "").
 (($prop->setter !== null) ? ("\$_qtprop->setter = ".json_encode($prop->setter).";\n") : "").
@@ -1154,6 +1181,14 @@ class QCodeStorage
 				$type->storage = array_merge_recursive($p_type->storage, $type->storage);
 		}
 		
+		if ($p_type->cfg)
+		{
+			if (!$type->cfg)
+				$type->cfg = $p_type->cfg;
+			else
+				$type->cfg = array_merge_recursive($p_type->cfg, $type->cfg);
+		}
+		
 		if ($p_type->api)
 		{
 			if (!$type->api)
@@ -1204,6 +1239,13 @@ class QCodeStorage
 					else
 						$prop_type->storage = array_merge_recursive($prop->storage, $prop_type->storage);
 				}
+				if ($prop->cfg)
+				{
+					if (!$prop_type->cfg)
+						$prop_type->cfg = $prop->cfg;
+					else
+						$prop_type->cfg = array_merge_recursive($prop->cfg, $prop_type->cfg);
+				}
 				if ($prop->rights)
 				{
 					if (!$prop_type->rights)
@@ -1253,11 +1295,13 @@ class QCodeStorage
 		rights
 		security
 		storage
+		cfg
 		api
 		========
 		PER PROP
 		========
 		storage
+		cfg
 		getter
 		setter
 		rights

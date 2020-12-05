@@ -8,6 +8,7 @@ final class QTrace
 	const Keep_Active_After = (60 * 10); # 10 minutes after the last ->touch()
 	
 	const FLUSH_EVERY_X_SEC = 1.25; // in sec
+	const MAX_TOTAL_TRACE_WRITE = 67108864; # 64 MB max
 	
 	/**
 	 * @var QTrace
@@ -30,6 +31,8 @@ final class QTrace
 	protected $file_data;
 	
 	protected $last_flush;
+	
+	protected $total_bytes_written = 0;
 	
 	public function touch()
 	{
@@ -213,6 +216,8 @@ final class QTrace
 			$list_start = ftell($this->file_list);
 			$list_witten = fwrite($this->file_list, $list_write);
 			
+			$this->total_bytes_written += $list_witten;
+			
 			if ($do_flush)
 				fflush($this->file_list);
 		}
@@ -229,6 +234,9 @@ final class QTrace
 			$data_write = json_encode($data_data)."\n";
 			$data_start = ftell($this->file_data);
 			$data_witten = fwrite($this->file_data, $data_write);
+			
+			$this->total_bytes_written += $data_witten;
+			
 			if ($do_flush)
 				fflush($this->file_data);
 		}
@@ -236,7 +244,10 @@ final class QTrace
 		# handle index
 		{
 			# id,parent,start,end,list_start,list_end,data_start,data_end
-			fputcsv($this->file_index, [$id, $parent_id ?: 0, $is_start, $is_end, $list_start, $list_witten, $data_start, $data_witten]);
+			$index_witten = fputcsv($this->file_index, [$id, $parent_id ?: 0, $is_start, $is_end, $list_start, $list_witten, $data_start, $data_witten]);
+			
+			$this->total_bytes_written += $index_witten;
+			
 			if ($do_flush)
 				fflush($this->file_index);
 		}
@@ -265,6 +276,9 @@ final class QTrace
 	
 	protected function begin_tr(array $config = null, array $data = null, array $tags = null)
 	{
+		if ($this->total_bytes_written >= static::MAX_TOTAL_TRACE_WRITE)
+			return null;
+		
 		$new_node = new \QTrace_Node();
 		$new_node->id = ++$this->last_id;
 		$new_node->parent = $this->node;
@@ -279,6 +293,9 @@ final class QTrace
 	
 	protected function end_tr(array $config = null, array $data = null, array $tags = null)
 	{
+		if ($this->total_bytes_written >= static::MAX_TOTAL_TRACE_WRITE)
+			return null;
+		
 		$this->trace_internal($this->node->id, isset($this->node->parent->id) ? $this->node->parent->id : 0, $config, $data, $tags, false, true);
 		$this->node = $this->node ? $this->node->parent : null;
 	}
@@ -319,6 +336,28 @@ final class QTrace
 	public static function Get_Request_Id()
 	{
 		return static::$Default ? static::$Default->request_id : null;
+	}
+	
+	public function cleanup()
+	{
+		$latest_dirs = scandir($this->traces_path, SCANDIR_SORT_DESCENDING);
+		
+		$latest_d = null;
+		foreach ($latest_dirs as $ld)
+		{
+			if (($ld !== '.') && ($ld !== '..') && is_dir($this->traces_path.$ld))
+			{
+				if ($latest_d === null)
+				{
+					$latest_d = $ld;
+				}
+				else 
+				{
+					exec("rm ".$this->traces_path.$ld."/*");
+					$rc = rmdir($this->traces_path.$ld);
+				}
+			}
+		}
 	}
 	
 	public function get_last_requests()

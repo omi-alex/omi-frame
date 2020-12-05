@@ -104,6 +104,10 @@ final class QModelType
 	/**
 	 * @var string[]
 	 */
+	public $cfg = null;
+	/**
+	 * @var string[]
+	 */
 	public $model = null;
 	
 	/**
