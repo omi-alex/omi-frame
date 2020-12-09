@@ -1003,7 +1003,8 @@ class QModelQuery
 			// HANDLE AS
 			if ($preceded_by_AS)
 			{
-				$as_name = $from_q->getNextAlias();
+				// $as_name = $from_q->getNextAlias();
+				$as_name = $idf_name;
 				$from->action_prop[$c_prop]["as"] = $as_name;
 				$from_q->parts[$from_q->p_index][] = " `".$as_name."`";
 				$from_q->pp_comma = (($from_q->p_index !== 2) && ($from_q->p_index !== 4));

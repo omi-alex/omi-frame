@@ -519,15 +519,16 @@ class QSqlModelInfoType
 	 * Calls for a resync of the data structure
 	 * 
 	 */
-	public static function ResyncDataStructure()
+	public static function ResyncDataStructure($storage = null)
 	{
-		$storage = QApp::GetStorage();
-		if (!$storage)
-			throw new Exception("Unable to find default storage");
-		$Data = QApp::Data();
+		$storage = $storage ?: QApp::GetStorage();
+		# if (!$storage)
+		#	throw new Exception("Unable to find default storage");
+		$data_class = QApp::GetDataClass();
+		$Data = new $data_class;
 		if (!$Data)
 			throw new Exception("Unable to find startup data");
-
+		
 		$storage->ensureTypeIdsWasIncluded(true);
 		
 		// refresh the mapping

@@ -2198,9 +2198,12 @@ class QModelArray extends ArrayObject implements QIModelArray
 						$arr[$k] = $val->exportToArray($selector, $with_type, $with_hidden_ids, $ignore_nulls);
 					else
 						$arr[$k] = (array)$val;
+					break;
 				}
 				default:
-					continue;
+				{
+					break;
+				}
 			}
 		}
 		

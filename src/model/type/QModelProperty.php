@@ -238,8 +238,6 @@ final class QModelProperty
 	}
 	
 	/**
-	 * by Mihai
-	 * to be rethinked
 	 * @return boolean
 	 */
 	public function isScalar()
@@ -247,7 +245,8 @@ final class QModelProperty
 		if (isset($this->_issc))
 			return $this->_issc;
 
-		$_ct = ($this->types && $this->types->options && is_array($this->types->options)) ? reset($this->types->options) : null;				
+		$_ct = is_string($this->types) ? $this->types : 
+				((is_object($this->types) && $this->types->options && is_array($this->types->options)) ? reset($this->types->options) : null);
 		try 
 		{
 			$ty = \QModelType::GetScalarTypeId($_ct);

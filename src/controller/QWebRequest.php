@@ -320,6 +320,16 @@ class QWebRequest
 			else
 			{
 				echo static::$ControllerOutput;
+			if (\QAutoload::GetDevelopmentMode())
+			{
+				if (self::$AjaxResponse['__hiddenOutput__'])
+				{
+					echo "<script type='text/javascript'>\n";
+					foreach (array_reverse(self::$AjaxResponse['__hiddenOutput__']) as $hidden_out)
+						echo "qvar_dump(".json_encode($hidden_out).");\n"; // qvar_dump("<h4>Server Unhandled Output</h4>");
+					echo "</script>\n";
+				}
+			}
 				static::$ControllerOutputSent = true;
 			}
 

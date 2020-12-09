@@ -801,6 +801,15 @@ class QSqlParserQuery
 					}
 					else
 						$calc_res = $conn->query("SELECT FOUND_ROWS() AS `FOUND_ROWS`;");
+					
+					if ($calc_res === false)
+					{
+						if (\QAutoload::GetDevelopmentMode())
+						{
+							qvar_dumpk($this->_count_q ?: "SELECT FOUND_ROWS() AS `FOUND_ROWS`;");
+						}
+						throw new Exception($conn->error);
+					}
 
 					$found_rows = $calc_res->fetch_assoc();
 					$collection_arr->setQueryCount((int)$found_rows["FOUND_ROWS"]);

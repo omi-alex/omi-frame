@@ -5479,7 +5479,16 @@ class QModel implements QIModel
 	}
 
 	######## QMODEL PATCH END !! #############
-	
+
+	/**
+	 * return filters to be used in listing query
+	 * 
+	 * @return string
+	 */
+	public static function GetListingQueryFilters()
+	{
+		return "";
+	}
 	
 	// add lines from here on
 	

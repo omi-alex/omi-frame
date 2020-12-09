@@ -61,9 +61,12 @@ trait QModel_Trait
 						$arr[$selector_k] = $val->exportToArray($selector_v, $with_type, $with_hidden_ids, $ignore_nulls);
 					else
 						$arr[$selector_k] = (array)$val;
+					break;
 				}
 				default:
-					continue;
+				{
+					break;
+				}
 			}
 
 		}

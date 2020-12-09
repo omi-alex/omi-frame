@@ -350,6 +350,16 @@ class QApp extends QAppModule
 	}
 	
 	/**
+	 * Sets the data class by class name
+	 * 
+	 * @param string $class
+	 */
+	public static final function SetDataClass_Internal($class)
+	{
+		self::$DataClass = $class;
+	}
+	
+	/**
 	 * Gets the data class name
 	 * 
 	 * @return string 

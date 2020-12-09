@@ -2956,7 +2956,7 @@ function _T($uid, $defaultText)
 	{
 		// init
 		$_T___INF = [];
-		$c_user = class_exists('Omi\User') ? \Omi\User::GetCurrentUser() : null;
+		$c_user = class_exists('Omi\User') ? \Omi\User::GetCurrentUser(false, false) : null;
 		if ($c_user && property_exists($c_user, 'UI_Language'))
 		{
 			if (!$c_user->wasSet('UI_Language'))

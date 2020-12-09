@@ -306,7 +306,11 @@ final class QAutoload
 		{
 			// in case we are in sync mode we are not allowed to load classes unless they have been already listed
 			if (self::$LockAutoload)
+			{
+				if (\QAutoload::GetDevelopmentMode())
+					qvar_dumpk("self::\$AutoloadArray", self::$AutoloadArray);
 				throw new Exception("Class `{$class_name}` was requested for load during sync.");
+			}
 		
 			if (!self::$AutoloadIncluded)
 				self::EnsureAutoloadWasIncluded($class_name);
@@ -848,15 +852,75 @@ final class QAutoload
 						$pos++;
 					}
 					
+					$generator_changes = [];
+					if (defined('Q_RUN_CODE_NEW_AS_TRAITS') && Q_RUN_CODE_NEW_AS_TRAITS)
+					{
+						
+						$save_state_backend_path = QAutoload::GetRuntimeFolder()."temp/files_state_backend.php";
+						$files_state_backend = null;
+						if (file_exists($save_state_backend_path))
+						{
+							require($save_state_backend_path);
+							$files_state_backend = $Q_FILES_STATE_BACKEND_SAVE;
+						}
+						
+						# scan Grid/template
+						# scan ~backend_config + ~backend_config/templates
+						// QGEN_ConfigDirBase = ~backend_config
+						// Omi_Mods_Path = "~includes/omi-mods/" + "gens/templates"
+						// $save_state_path = QAutoload::GetRuntimeFolder()."temp/files_state.php";
+						$backend_scan_in = [Omi_Mods_Path."gens/templates/", QGEN_ConfigDirBase];
+						$list_backend = [];
+						foreach ($backend_scan_in as $backend_scan_in_itm)
+						{
+							$ri_list_backend = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($backend_scan_in_itm));
+							$list_backend_templates = [];
+							
+							$prev_state_bag = $files_state_backend[$backend_scan_in_itm];
+							
+							foreach ($ri_list_backend ?: [] as $rel_path => $item)
+							{
+								if (!$item->isFile())
+									continue;
+								$ext = ($p = strrpos($rel_path, ".")) !== false ? substr($rel_path, $p + 1) : null;
+								if (($ext === 'php') || ($ext === 'tpl'))
+								{
+									$m_time = $item->getMTime();
+									$i_size = $item->getSize();
+									$prev_state = $prev_state_bag[$rel_path] ?? null;
+									if (!$prev_state)
+										$generator_changes[$backend_scan_in_itm][$rel_path] = [$m_time, $i_size, 'added'];
+									else if (($prev_state[0] !== $m_time) || ($prev_state[1] !== $i_size))
+										$generator_changes[$backend_scan_in_itm][$rel_path] = [$m_time, $i_size, 'changed'];
+									$list_backend_templates[$rel_path] = [$m_time, $i_size];
+								}
+							}
+							$list_backend[$backend_scan_in_itm] = $list_backend_templates;
+						}
+						
+						// last ... check for removed
+						foreach ($files_state_backend ?: [] as $fsb_watch_folder => $fsb_watch_folder_list)
+						{
+							$new_fsb_list = $list_backend[$fsb_watch_folder];
+							foreach ($fsb_watch_folder_list ?: [] as $fsb_item_path => $fsb_item)
+							{
+								if (!isset($new_fsb_list[$fsb_item_path]))
+									$generator_changes[$fsb_watch_folder][$fsb_item_path] = [$fsb_item[0], $fsb_item[1], 'removed'];
+							}
+						}
+					}
+					
 					// we need to include all required classes 'manually' as Autoload will not be relayable while in sync
+					self::IncludeClassesInFolder(Q_FRAME_PATH."model/", true);
 					self::IncludeClassesInFolder(Q_FRAME_PATH."model/type/", true);
 					self::IncludeClassesInFolder(Q_FRAME_PATH."useful/code/", true);
 					self::IncludeClassesInFolder(Q_FRAME_PATH."useful/parsers/", true);
+					self::IncludeClassesInFolder(Q_FRAME_PATH."controller/", true);
 					// self::IncludeClassesInFolder(Q_FRAME_PATH."controller/", true);
 
 					// changed files : $changed
 					// removed files : $files_state
-					if ((!$full_resync) && $changed && (!$new) && (!$files_state) && $changed[Q_FRAME_PATH] && (count($changed) === 1))
+					if ((!$full_resync) && (!$generator_changes) && $changed && (!$new) && (!$files_state) && $changed[Q_FRAME_PATH] && (count($changed) === 1))
 					{
 						# frame only changes will not trigger any sync ! It should not be patched anywhere !
 						# if in the frame, do not do any complicated sync
@@ -865,7 +929,7 @@ final class QAutoload
 							throw new \Exception('Unable to save files state');
 						opcache_invalidate($save_state_path, true);
 					}
-					else if ($full_resync || $new || $changed || $files_state)
+					else if ($full_resync || $new || $changed || $files_state || $generator_changes)
 					{
 						static::$HasChanges = true;
 						// based on some files dependency the code sync should be able to manage the issues 
@@ -959,12 +1023,20 @@ final class QAutoload
 								set_time_limit(60 * 5);
 						}
 						
-						$sync->resync($info, $changed, $removed_files, $new, $full_resync);
+						$sync->resync($info, $changed, $removed_files, $new, $full_resync, $generator_changes);
 						
 						$failed = file_put_contents($save_state_path, qArrayToCode($info, "Q_FILES_STATE_SAVE"));
 						if ($failed === false)
 							throw new \Exception('Unable to save files state');
 						opcache_invalidate($save_state_path, true);
+						
+						if (defined('Q_RUN_CODE_NEW_AS_TRAITS') && Q_RUN_CODE_NEW_AS_TRAITS)
+						{
+							$failed_backend = file_put_contents($save_state_backend_path, qArrayToCode($list_backend, "Q_FILES_STATE_BACKEND_SAVE"));
+							if ($failed_backend === false)
+								throw new \Exception('Unable to save files state for backend');
+							opcache_invalidate($save_state_backend_path, true);
+						}
 					}
 					else
 					{
@@ -1339,6 +1411,14 @@ final class QAutoload
 	public static function UnlockAutoload()
 	{
 		self::$LockAutoload = false;
+	}
+	
+	/**
+	 * Unlocks autoload
+	 */
+	public static function LockAutoload()
+	{
+		self::$LockAutoload = true;
 	}
 	
 	/**
