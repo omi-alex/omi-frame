@@ -8,7 +8,7 @@
  * - Returns the response
  * 
  */
-class QWebRequest
+final class QWebRequest
 {
 	/**
 	 * The URL that will answer to RESTful requests
@@ -111,7 +111,9 @@ class QWebRequest
 	{
 		try
 		{
-			static::$RequestId = uniqid();
+			if (!defined('Q_REQUEST_UID'))
+				define('Q_REQUEST_UID', uniqid("", true));
+			static::$RequestId = Q_REQUEST_UID;
 			self::$AjaxRequest = self::IsAjaxRequest();
 			self::$FastAjax = $fast_call = ($_POST["__qFastAjax__"] || $_GET["__qFastAjax__"]);
 			

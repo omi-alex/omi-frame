@@ -1974,7 +1974,7 @@ function qDSDumpVar($var, $max_depth = 8, &$bag = null, $depth = 0, $accessModif
 			echo "<div>";
 			foreach ($var as $k => $v)
 			{
-				echo $pad."\t<b>{$k}</b>";
+				echo $pad."\t<b>".((is_string($k) && (strlen($k) === 0)) ? "''" : htmlspecialchars($k))."</b>";
 				if ($max_depth)
 					qDSDumpVar($v, $max_depth - 1, $bag, $depth + 1, $accessModifier, $wasSet);
 				else
@@ -2089,7 +2089,8 @@ function qDSDumpVar($var, $max_depth = 8, &$bag = null, $depth = 0, $accessModif
 
 				if ($v !== null)
 				{
-					echo $pad."\t<b>{$k}</b>";
+					# echo $pad."\t<b>".((is_string($k) && (strlen($k) === 0)) ? "''" : htmlspecialchars($k))."</b>";
+					echo $pad."\t<b>".((is_string($k) && (strlen($k) === 0)) ? "''" : htmlspecialchars($k))."</b>";
 					if ($max_depth)
 					{
 						qDSDumpVar($v, $max_depth - 1, $bag, $depth + 1, $accessModifier, $wasSet);

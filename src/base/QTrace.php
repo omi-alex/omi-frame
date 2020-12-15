@@ -97,7 +97,9 @@ final class QTrace
 	
 	protected function init_for_trace()
 	{
-		$this->request_id = uniqid();
+		if (!defined('Q_REQUEST_UID'))
+			define('Q_REQUEST_UID', uniqid("", true));
+		$this->request_id = Q_REQUEST_UID;
 		
 		$time = $_SERVER["REQUEST_TIME_FLOAT"];
 		$path = $this->logs_dir."/traces/".$this->app_rel_dir."/".date('Y-m-d', $time)."/";

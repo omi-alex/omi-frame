@@ -1221,8 +1221,11 @@ class QApi
 				$parameters = [];
 			$parameters = array_merge($parameters, $fromParams);
 		}
-		
+				
 		$q = static::__Query(($initialFrom !== $from) ? [$from, $initialFrom] : $from, $selector, $parameters, $only_first, $id);
+		
+		# if ($from === 'GenbandSBC_Endpoints')
+		#	\QSecurity_Check::Secure_Request_Data($q, $selector, $from);
 		
 		return $q;
 	}
