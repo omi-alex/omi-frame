@@ -1662,6 +1662,136 @@ trait QModel_Trait
 		}
 	}
 	
+		/**
+	 * 
+	 * @param string|array $selector
+	 * @param string $cls
+	 * @param boolean $forceIds
+	 * @return \QIModel
+	 * @throws Exception
+	 */
+	public function getClone($selector = null, &$_bag = [], bool $skip_mark_for_removal = false, bool $keep_leaf_ids = false, bool $keep_lead_reference = false)
+	{
+		if ($selector === null)
+			$selector = static::GetModelEntity();
+		if (is_string($selector))
+			$selector = qParseEntity($selector);
+
+		if (!is_array($selector))
+			return;
+
+		$data = reset($selector);
+		$prop = key($selector);
+		$all_keys = ($prop === "*");
+
+		$cls = get_class($this);
+
+		$type_inf = $all_keys ? QModelQuery::GetTypesCache($cls) : null;
+
+		if ($_bag[$this->getTemporaryId()])
+			return $_bag[$this->getTemporaryId()];
+
+		$clone = new $cls();
+
+		$_bag[$this->getTemporaryId()] = $clone;
+
+		$modelType = $clone->getModelType();
+
+		if ($all_keys)
+		{
+			// skip #%tables
+			next($type_inf);
+			// skip #%table
+			next($type_inf);
+			// skip #%id
+			next($type_inf);
+			// skip #%misc
+			next($type_inf);
+
+			$prop = key($type_inf);
+			// we no longer loop
+			$data = $selector["*"];
+		}
+		
+		$props_count = 0;
+		$props_last = null;
+		
+		while ($prop)
+		{
+			//echo "<div style='color: red;'>".$prop."</div>";
+			// setup the property only if is accepted by the model
+			if ($modelType->properties[$prop])
+			{
+				$props_count++;
+				$props_last = $prop;
+				
+				$val = $this->{$prop};
+				if ($val !== null)
+				{
+					if ($val instanceof QIModel)
+					{
+						$selector_prop = $selector[$prop];
+						// the collection - it can be a collection of models or a scalar collection
+						if ($val instanceof QIModelArray)
+						{
+							$vcls = get_class($val);
+							$clone->{"set{$prop}"}(new $vcls());
+							$p_meth = "set{$prop}_Item_";
+							foreach ($val as $k => $item)
+							{
+								if ($skip_mark_for_removal && q_is_set_for_removal($item, $val))
+									continue;
+								
+								if ($item instanceof QIModel)
+									$item = $item->getClone($selector_prop, $_bag, false, $keep_leaf_ids, $keep_lead_reference);
+								$clone->$p_meth($item, $k);
+							}
+						}
+						else
+						{
+							$clone->{"set{$prop}"}($val->getClone($selector_prop, $_bag, false, $keep_leaf_ids, $keep_lead_reference));
+						}
+					}
+					else
+						$clone->{"set{$prop}"}($val);
+				}
+			}
+
+			if ($all_keys)
+			{
+				next($type_inf);
+				$prop = key($type_inf);
+				$data = $selector[$prop] ?: [];
+			}
+			else
+			{
+				// here it must be an array
+				$data = next($selector);
+				$prop = key($selector);
+			}
+		}
+		
+		if (($keep_leaf_ids || $keep_lead_reference) && (($props_count === 0) || (($props_count === 1) && ($props_last === 'Id'))))
+		{
+			if ($keep_leaf_ids)
+			{
+				if ($keep_lead_reference)
+					throw new \Exception('$keep_leaf_ids is not compatbile with $keep_lead_reference');
+				if (($tmp_id = $this->getId()))
+					$clone->setId($tmp_id);
+			}
+			else
+			{
+				if ($keep_leaf_ids)
+					throw new \Exception('$keep_leaf_ids is not compatbile with $keep_lead_reference');
+				# we return a reference
+				$clone = $this;
+			}
+		}
+		
+		return $clone;
+	}
+	
 	protected static $Sync_Mapping = [
 		"Offers.NuviaOffer" => ["Nuvia_Offers"],
 		"Offers.NuviaOffer.Item" => false,
