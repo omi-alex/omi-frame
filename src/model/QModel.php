@@ -455,52 +455,7 @@ class QModel implements QIModel
 			}
 		}
 	}
-	
-	/**
-	 * 
-	 * Queries the object to get more data
-	 * For QIModelArray a new instance will be created and returned
-	 * 
-	 * @param string $query
-	 * @param array|string $binds
-	 * @param array $dataBlock
-	 * @param boolean $skip_security
-	 * 
-	 * @return QIModel
-	 */
-	public function populate($query = null, $binds = null, &$dataBlock = null, $skip_security = true, \QIStorage $storage = null)
-	{
-		if (($query === null) && ($binds === null) && ($iid = $this->getId()))
-		{
-			$selector = static::GetModelEntity();
-			if (is_array($selector))
-				$selector = qImplodeEntity($selector);
-			$query = $selector." WHERE Id=?";
-			$binds = $iid;
-		}
-		//  static function BindQuery($query, $binds, $from = null,    &$dataBlock = null, $skip_security = true, $filter_selector = null, $populate_only = false)
-		return QModelQuery::BindQuery($query, $binds, $this ?: get_called_class(), $dataBlock, $skip_security, null, true, $storage);
-	}
-
-	/**
-	 * 
-	 * Queries the object to get more data
-	 * For QIModelArray a new instance will be created and returned
-	 * 
-	 * @param string $query
-	 * @param array|string $binds
-	 * @param array $dataBlock
-	 * @param boolean $skip_security
-	 * 
-	 * @return QIModel
-	 */
-	public function query($query, $binds = null, &$dataBlock = null, $skip_security = true)
-	{
-		// var_dump(get_called_class(), __CLASS__, get_class($this));
-		// public static function BindQuery($query, $binds, QIModel $from = null, &$dataBlock = null, $skip_security = false)
-		return QModelQuery::BindQuery($query, $binds, $this ?: get_called_class(), $dataBlock, $skip_security);
-	}
-	
+		
 	/**
 	 * Queries the storage to get data
 	 * For QIModelArray a new instance will be created and returned

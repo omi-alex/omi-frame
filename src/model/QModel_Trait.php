@@ -2,6 +2,64 @@
 
 trait QModel_Trait
 {
+	/**
+	 * 
+	 * Queries the object to get more data
+	 * For QIModelArray a new instance will be created and returned
+	 * 
+	 * @param string $query
+	 * @param array|string $binds
+	 * @param array $dataBlock
+	 * @param boolean $skip_security
+	 * 
+	 * @return QIModel
+	 */
+	public function query($query, $binds = null, &$dataBlock = null, $skip_security = true)
+	{
+		if (isset($this) && (!$this->getId()) && \QAutoload::GetDevelopmentMode())
+		{
+			qvar_dumpk($this, func_get_args(), debug_backtrace());
+			throw new \Exception("we need to see these cases! @query");
+		}
+
+		// var_dump(get_called_class(), __CLASS__, get_class($this));
+		// public static function BindQuery($query, $binds, QIModel $from = null, &$dataBlock = null, $skip_security = false)
+		return QModelQuery::BindQuery($query, $binds, $this ?: get_called_class(), $dataBlock, $skip_security);
+	}
+	
+	
+	/**
+	 * 
+	 * Queries the object to get more data
+	 * For QIModelArray a new instance will be created and returned
+	 * 
+	 * @param string $query
+	 * @param array|string $binds
+	 * @param array $dataBlock
+	 * @param boolean $skip_security
+	 * 
+	 * @return QIModel
+	 */
+	public function populate($query = null, $binds = null, &$dataBlock = null, $skip_security = true, \QIStorage $storage = null)
+	{
+		if (isset($this) && (!$this->getId()) && \QAutoload::GetDevelopmentMode())
+		{
+			qvar_dumpk($this, func_get_args(), debug_backtrace());
+			throw new \Exception("we need to see these cases! @populate");
+		}
+	
+		if (($query === null) && ($binds === null) && ($iid = $this->getId()))
+		{
+			$selector = static::GetModelEntity();
+			if (is_array($selector))
+				$selector = qImplodeEntity($selector);
+			$query = $selector." WHERE Id=?";
+			$binds = $iid;
+		}
+		//  static function BindQuery($query, $binds, $from = null,    &$dataBlock = null, $skip_security = true, $filter_selector = null, $populate_only = false)
+		return QModelQuery::BindQuery($query, $binds, $this ?: get_called_class(), $dataBlock, $skip_security, null, true, $storage);
+	}
+	
 	public static function Get_Data_Model_Caption($data)
 	{
 		if (($data instanceof \QModelArray) || (is_array($data)))
@@ -799,6 +857,10 @@ trait QModel_Trait
 			else
 				$syncItm->setId($data->getId());
 		}
+		else
+		{
+			
+		}
 		
 		// set remote id
 		$syncItm->__rid = $data->getId();
@@ -933,8 +995,25 @@ trait QModel_Trait
 					$syncItm->query($pName . ".{Id" . (($ref_sync_selector && (strlen($ref_sync_selector) > 0)) ? ", " . $ref_sync_selector : "") . "}");
 				}
 				
-				$syncItm->{"set".$pName}($value::GetRemoteSyncedData($value, is_array($selector) ? $selector[$pName] : $selector, $_prop, $includeNonModelProps,
-						$syncItm->{$pName}, $syncItm, $_bag, $entityLoaded, $_all_objects));
+				$skip_setup = false;
+				
+				# if ($_GET['debug'])
+				{
+					if (isset($syncItm->{$pName}->Gid) && ($syncItm->{$pName}->Gid != $value->Id))
+					{
+						$in_db_sync_item = $value::GetRemoteSyncedData($value, is_array($selector) ? $selector[$pName] : $selector, 
+											$_prop, $includeNonModelProps,
+											null, $syncItm, $_bag, false, $_all_objects);
+						$syncItm->{"set".$pName}($in_db_sync_item);
+						$skip_setup = true;
+					}
+				}
+				
+				if (!$skip_setup)
+				{
+					$syncItm->{"set".$pName}($value::GetRemoteSyncedData($value, is_array($selector) ? $selector[$pName] : $selector, $_prop, $includeNonModelProps,
+							$syncItm->{$pName}, $syncItm, $_bag, $entityLoaded, $_all_objects));
+				}
 			}
 		}
 		return $syncItm;
@@ -954,6 +1033,10 @@ trait QModel_Trait
 	 */
 	public static function SetupToSendData($appData, $currentData = null, &$_bag = null, &$_byAppPropItems = null, string $path = "")
 	{
+		# @TODO - UGLY FIX, recursive selector !!! This method should not recurse in depth, but go level by level
+		if ((substr($path, -strlen('.IncompatibleWith.IncompatibleWith')) === '.IncompatibleWith.IncompatibleWith') || ($path === '.IncompatibleWith.IncompatibleWith'))
+			return;
+		
 		if (!$_bag)
 			$_bag = [];
 
@@ -1662,7 +1745,7 @@ trait QModel_Trait
 		}
 	}
 	
-		/**
+	/**
 	 * 
 	 * @param string|array $selector
 	 * @param string $cls
@@ -1824,6 +1907,11 @@ trait QModel_Trait
 		"Offers.Items.Merch.Categories.Parent.Parent.Content" => false,
 		"Offers.Items.Merch.Categories.Parent.Content" => false,
 
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer" => ["Offers"],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items" => false,
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Content" => false,		
+		
 		"Offers.Items.Merch.IncompatibleWith.Content" => false,
 		"Offers.Items.Merch.IncompatibleWith.Categories.Content" => false,
 		"Offers.Items.Merch.IncompatibleWith.Categories" => ["MerchCategories"],
@@ -1883,6 +1971,10 @@ trait QModel_Trait
 		
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.Content.Owner" => ["Suppliers"],
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Owner" => ["Suppliers"],
 		
 		"PricingIntervals.Owner" => ["Suppliers"],
 		"PricingIntervals.Owner.WhiteLabel" => false,

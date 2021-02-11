@@ -1224,9 +1224,6 @@ class QApi
 				
 		$q = static::__Query(($initialFrom !== $from) ? [$from, $initialFrom] : $from, $selector, $parameters, $only_first, $id);
 		
-		# if ($from === 'GenbandSBC_Endpoints')
-		#	\QSecurity_Check::Secure_Request_Data($q, $selector, $from);
-		
 		return $q;
 	}
 	
@@ -1610,8 +1607,9 @@ class QApi
 
 			//  valid characters are a-z, A-Z, 0-9 and '-,'
 			$new_session_id = preg_replace("/[^a-zA-Z0-9\\-]/us", '-', uniqid("", true));
-			session_id($new_session_id);
-			session_start();
+			\Omi\User::Set_Temporary_Session($new_session_id);
+			# session_id($new_session_id);
+			# session_start();
 
 			\QWebRequest::RestoreStaticContext([
 								"FastAjax" => true,
@@ -1634,14 +1632,7 @@ class QApi
 			if (!$password)
 				throw new \Exception('Missing remote user password. Owner['.$owner->getId().']: '.$owner->getModelCaption().'; Partner['.$partner->getId().']: '.$partner->getModelCaption());
 
-			$login_res = \Omi\User::LoginInternal($user_or_email, $password, session_id(), false);
-
-			//qvardump("\Active logins", \Omi\User::$ActiveLogins);
-			//$identity = \Omi\User::CheckLogin();
-			//qvardump("\$identity", $identity);
-
-
-			//qvardump("IDENTITY BEFORE :: ", $identity, $current_identity);
+			$login_res = \Omi\User::LoginInternal($user_or_email, $password, $new_session_id /* session_id() */, false, true);
 
 			if ($login_res !== true)
 			{
@@ -1650,7 +1641,7 @@ class QApi
 				throw new \Exception('Login failed for: '.$user_or_email);
 			}
 			
-			$login_identity = \Omi\User::CheckLogin();
+			$login_identity = \Omi\User::CheckLogin($new_session_id);
 			if (!$login_identity)
 				throw new \Exception('Login identity failed for: '.$user_or_email);
 
@@ -1683,6 +1674,7 @@ class QApi
 			\Omi\User::Logout();
 			session_write_close();
 			
+			\Omi\User::Set_Temporary_Session($saved_context['session_id']);
 			session_id($saved_context['session_id']);
 			session_start();
 			// session_id($saved_context['session_id']);
