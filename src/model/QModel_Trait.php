@@ -18,8 +18,8 @@ trait QModel_Trait
 	{
 		if (isset($this) && (!$this->getId()) && \QAutoload::GetDevelopmentMode())
 		{
-			qvar_dumpk($this, func_get_args(), debug_backtrace());
-			throw new \Exception("we need to see these cases! @query");
+			//qvar_dumpk($this, func_get_args(), debug_backtrace());
+			//throw new \Exception("we need to see these cases! @query");
 		}
 
 		// var_dump(get_called_class(), __CLASS__, get_class($this));
@@ -44,8 +44,8 @@ trait QModel_Trait
 	{
 		if (isset($this) && (!$this->getId()) && \QAutoload::GetDevelopmentMode())
 		{
-			qvar_dumpk($this, func_get_args(), debug_backtrace());
-			throw new \Exception("we need to see these cases! @populate");
+			//qvar_dumpk($this, func_get_args(), debug_backtrace());
+			//throw new \Exception("we need to see these cases! @populate");
 		}
 	
 		if (($query === null) && ($binds === null) && ($iid = $this->getId()))
