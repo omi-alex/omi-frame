@@ -18,8 +18,8 @@ trait QModel_Trait
 	{
 		if (isset($this) && (!$this->getId()) && \QAutoload::GetDevelopmentMode())
 		{
-			qvar_dumpk($this, func_get_args(), debug_backtrace());
-			throw new \Exception("we need to see these cases! @query");
+			//qvar_dumpk($this, func_get_args(), debug_backtrace());
+			//throw new \Exception("we need to see these cases! @query");
 		}
 
 		// var_dump(get_called_class(), __CLASS__, get_class($this));
@@ -44,8 +44,8 @@ trait QModel_Trait
 	{
 		if (isset($this) && (!$this->getId()) && \QAutoload::GetDevelopmentMode())
 		{
-			qvar_dumpk($this, func_get_args(), debug_backtrace());
-			throw new \Exception("we need to see these cases! @populate");
+			//qvar_dumpk($this, func_get_args(), debug_backtrace());
+			//throw new \Exception("we need to see these cases! @populate");
 		}
 	
 		if (($query === null) && ($binds === null) && ($iid = $this->getId()))
@@ -1929,6 +1929,13 @@ trait QModel_Trait
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.Content" => false,
 
 		"Offers.Items.Merch.DefaultOffer.Items.Merch.DefaultOffer" => ["Offers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories" => ["MerchCategories"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Content" => false,
+		
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent.Parent.Content" => false,
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent.Content" => false,
 
 		"Offers.Items.Merch.DefaultOffer.Services" => false,
 		"Offers.Items.Merch.DefaultOffer.Products" => false,
@@ -1975,6 +1982,9 @@ trait QModel_Trait
 		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items.Owner" => ["Suppliers"],
 		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Content.Owner" => ["Suppliers"],
 		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Owner" => ["Suppliers"],
 		
 		"PricingIntervals.Owner" => ["Suppliers"],
 		"PricingIntervals.Owner.WhiteLabel" => false,
