@@ -2120,17 +2120,20 @@ class QModelArray extends ArrayObject implements QIModelArray
 	 * 
 	 * @return null
 	 */
-	public static function SetupToSendData($appData, $currentData = null, &$_bag = null, &$_byAppPropItems = null)
+	public static function SetupToSendData($appData, $currentData = null, &$_bag = null, &$_byAppPropItems = null, string $path = "", array &$new_app_items = null, bool $set_on_app = true)
 	{
 		if (!$currentData || (count($currentData) === 0))
 			return;
+		
+		if ($new_app_items === null)
+			$new_app_items = [];
 
 		// just go thorugh all items and call the method on correct instance if QIModel, call on QModel otherwise
 		foreach ($currentData as $item)
 		{
 			(!($item instanceof \QIModel)) ? 
-				\QModel::SetupToSendData($appData, $item, $_bag, $_byAppPropItems) : 
-				$item::SetupToSendData($appData, $item, $_bag, $_byAppPropItems);
+				\QModel::SetupToSendData($appData, $item, $_bag, $_byAppPropItems, $path, $new_app_items, $set_on_app) : 
+				$item::SetupToSendData($appData, $item, $_bag, $_byAppPropItems, $path, $new_app_items, $set_on_app);
 		}
 	}
 	

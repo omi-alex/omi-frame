@@ -900,9 +900,10 @@ class QApi
 	 * 
 	 * @return QIModel
 	 */
-	public static function QSync($from, $selector = null, $parameters = null)
+	public static function QSync($from, $selector = null, $parameters = null, array $ids_list = null, bool $apply_binds = true, array &$data_block = null, array &$used_app_selectors = null, string $query_by_data_type = null)
 	{
-		return static::__QSync($from, $selector, $parameters);
+		# __QSync($from, $selector = null, $parameters = null, $only_first = false, $id = null)
+		return static::__QSync($from, $selector, $parameters, false, null, $ids_list, $apply_binds, $data_block, $used_app_selectors, $query_by_data_type);
 	}
 	
 	/**
@@ -943,7 +944,7 @@ class QApi
 	 * @return QIModel
 	 * @throws Exception
 	 */
-	private static function __QSync($from, $selector = null, $parameters = null, $only_first = false, $id = null)
+	private static function __QSync($from, $selector = null, $parameters = null, $only_first = false, $id = null, array $ids_list = null, bool $apply_binds = true, array &$data_block = null, array &$used_app_selectors = null, string $query_by_data_type = null)
 	{
 		$dataCls = \QApp::GetDataClass();
 
@@ -970,8 +971,10 @@ class QApi
 				($id || $only_first) ? $dataCls::GetFormEntity_Final($initialFrom) : $dataCls::GetListEntity_Final($initialFrom) : null;
 		}
 
-		$fromParams = ($id || $only_first) ? $dataCls::GetFormBinds($initialFrom) : $dataCls::GetListBinds($initialFrom);
-
+		$fromParams = null;
+		if ($apply_binds)
+			$fromParams = ($id || $only_first) ? $dataCls::GetFormBinds($initialFrom) : $dataCls::GetListBinds($initialFrom);
+		
 		if ($fromParams)
 		{
 			if (!$parameters)
@@ -983,7 +986,9 @@ class QApi
 		{
 			if (!static::$_Caller_Company_In_Callee_Box->BuyPriceProfile)
 				throw new \Exception('Missing price profile on partner');
-			$parameters["PartnerPriceProfile"] = static::$_Caller_Company_In_Callee_Box->BuyPriceProfile->getId();
+			
+			if ($apply_binds)
+				$parameters["PartnerPriceProfile"] = static::$_Caller_Company_In_Callee_Box->BuyPriceProfile->getId();
 		}
 
 		$parsed_sources = $from ? static::ParseSourceInfo($from) : [null, null];
@@ -1001,7 +1006,7 @@ class QApi
 			$storage = QApp::GetStorage($src_key);
 			$storage_model = QApp::GetDataClass();
 			$src_from_types = static::DetermineFromTypes($storage_model, $src_from);
-			$result[$src_key] = $storage::ApiQuerySync($storage_model, $src_from, $src_from_types, $selector, $parameters, $only_first, $id);
+			$result[$src_key] = $storage::ApiQuerySync($storage_model, $src_from, $src_from_types, $selector, $parameters, $only_first, $id, $ids_list, $data_block, $used_app_selectors, $query_by_data_type);
 		}
 		
 		$ret = !$result ? null : ((count($result) === 1) ? reset($result) : $result);
@@ -1018,7 +1023,7 @@ class QApi
 	 * @return mixed
 	 * @throws Exception
 	 */
-	public static function Import($destination, $data, $selector = true)
+	public static function Import($destination, $data, $selector = true, bool $explicit_selector = false)
 	{
 		static::$_InImportProcess = true;
 		$parsed_sources = $destination ? static::ParseSourceInfo($destination) : [null, null];
@@ -1066,7 +1071,7 @@ class QApi
 					$data[] = $_item;
 				}
 			}
-			$result[$src_key] = $storage::ApiImport($storage_model, $src_from, $src_from_types, $data, QIModel::TransformMerge, $selector);
+			$result[$src_key] = $storage::ApiImport($storage_model, $src_from, $src_from_types, $data, QIModel::TransformMerge, $selector, $explicit_selector);
 		}
 
 		static::$_InImportProcess = false;
@@ -1681,19 +1686,22 @@ class QApi
 			foreach ($saved_context['session'] as $k => $v)
 				$_SESSION[$k] = $v;
 			
-			$exit_impersonate = QQuery('Users.{Impersonate.Id WHERE Id=?}', $enter_impersonate->getId())->Users;
-			$exit_impersonate = $exit_impersonate ? reset($exit_impersonate) : null;
-			
-			$enter_impersonate_id = $enter_impersonate->Impersonate ? $enter_impersonate->Impersonate->getId() : null;
-			$exit_impersonate_id = $exit_impersonate->Impersonate ? $exit_impersonate->Impersonate->getId() : null;
-			if ($enter_impersonate_id != $exit_impersonate_id)
+			if ($enter_impersonate && isset($enter_impersonate->Id))
 			{
-				if ($enter_impersonate)
-				{
-					$enter_impersonate->setImpersonate($enter_impersonate->Impersonate);
-					$enter_impersonate->save("Impersonate");
+				$exit_impersonate = QQuery('Users.{Impersonate.Id WHERE Id=?}', $enter_impersonate->getId())->Users;
+				$exit_impersonate = $exit_impersonate ? reset($exit_impersonate) : null;
 
-					\Omi\App::GetSecurityUser(true);
+				$enter_impersonate_id = $enter_impersonate->Impersonate ? $enter_impersonate->Impersonate->getId() : null;
+				$exit_impersonate_id = $exit_impersonate->Impersonate ? $exit_impersonate->Impersonate->getId() : null;
+				if ($enter_impersonate_id != $exit_impersonate_id)
+				{
+					if ($enter_impersonate)
+					{
+						$enter_impersonate->setImpersonate($enter_impersonate->Impersonate);
+						$enter_impersonate->save("Impersonate");
+
+						\Omi\App::GetSecurityUser(true);
+					}
 				}
 			}
 			

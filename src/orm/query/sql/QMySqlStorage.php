@@ -1322,7 +1322,7 @@ class QMySqlStorage extends QSqlStorage
 	 * @return mixed
 	 * @throws Exception
 	 */
-	public static function ApiImport($storage_model, $from, $from_type, $data, $state = null, $selector = null)
+	public static function ApiImport($storage_model, $from, $from_type, $data, $state = null, $selector = null, bool $explicit_selector = false)
 	{
 		foreach ($data ?: [] as $d)
 		{
@@ -1334,19 +1334,26 @@ class QMySqlStorage extends QSqlStorage
 		$model->setId(1); // @todo : we need to do it this way atm !!!
 		$model->$from = $data;
 		// get the selector
-		$selector = $from_type ? [$from => static::GetSaveSelector($from, $from_type, $data, $state, $selector)] : $from;
+		if (!$explicit_selector)
+			$selector = $from_type ? [$from => static::GetSaveSelector($from, $from_type, $data, $state, $selector)] : $from;
 
 		if ($model->$from instanceof QModelArray)
 			$model->$from->setModelProperty($from, $model);
 
-		$use_states = QApi::SecureStates($model, $from, $state, $selector);
+		# $use_states = QApi::SecureStates($model, $from, $state, $selector);
 		
 		\QApi::$DataToProcess = $model;
 
 		//$t1 = microtime(true);
 		// trigger before import
 		// $model->beforeImport(true);
+		if ($explicit_selector)
+		{
+			$use_states = null;
+			$selector = [$from => $selector];
+		}
 		
+		#														bool $trigger_provision = true, bool $trigger_events = true, bool $trigger_save = false, bool $trigger_import = false
 		$return_data = $model->save($selector, null, $use_states, true, true, false, true);
 
 		// $model->afterImport(true);
@@ -1430,7 +1437,7 @@ class QMySqlStorage extends QSqlStorage
 	 * 
 	 * @return QIModel
 	 */
-	public static function ApiQuerySync($storage_model, $from, $from_type, $selector = null, $parameters = null, $only_first = false, $id = null)
+	public static function ApiQuerySync($storage_model, $from, $from_type, $selector = null, $parameters = null, $only_first = false, $id = null, array $ids_list = null, array &$data_block = null, array &$used_app_selectors = null, string $query_by_data_type = null)
 	{
 		$called_class = get_called_class();
 		if (method_exists($called_class, "ApiQuery_in_"))
@@ -1450,10 +1457,24 @@ class QMySqlStorage extends QSqlStorage
 			if (!$query)
 			{
 				$query = $only_first ? $from_type::GetItemSyncQuery() : $from_type::GetListingSyncQuery();
+				
+				if ($used_app_selectors !== null)
+					$used_app_selectors[$from][$from_type][] = \Omi\App::Fix_Sync_Listing_Entity($from_type, $only_first ? $from_type::GetModelSyncEntity() : $from_type::GetListingSyncEntity());
 				// secure parameters (not possible atm ... needs a new implementation)
-				$query = $from.".{".$query."}";
+				if (!$query_by_data_type)
+					$query = $from.".{".$query."}";
 				if (is_array($selector))
 					$selector = [$from => $selector];
+				
+				# qvar_dumpk($only_first ? 'GetItemSyncQuery' : 'GetListingSyncQuery', $from_type, $query);
+			}
+			else
+			{
+				if ($used_app_selectors !== null)
+				{
+					$used_app_selectors[$from_type][] = $query;
+					throw new \Exception('Not expected. The parameter added is not a selector.');
+				}
 			}
 		}
 		else // scalars
@@ -1473,10 +1494,29 @@ class QMySqlStorage extends QSqlStorage
 				$parameters = $id;
 		}
 
-		$data_block = [];
-
-		$return_data = QModelQuery::BindQuery($query, $parameters, null, $data_block, true, $selector);
-		$return_data = $return_data ? $return_data->$from : null;
+		if ($data_block === null)
+			$data_block = [];
+		
+		if (is_array($ids_list))
+		{
+			if (strpos($query, "??Id_IN?") === false)
+				throw new \Exception('Missing ??Id_IN? for `'.$from.'`');
+			$parameters['Id_IN'] = [$ids_list];
+			
+			# qvar_dumpk('$query', $query, $parameters);
+			
+		}
+		
+		if ($query_by_data_type)
+		{
+			# return QModelQuery::BindQuery($query, $binds, $this ?: get_called_class(), $dataBlock, $skip_security);
+			$return_data = \QModelQuery::BindQuery($query, $parameters, $query_by_data_type, $data_block, true, $selector);
+		}
+		else
+		{
+			$return_data = QModelQuery::BindQuery($query, $parameters, null, $data_block, true, $selector);
+			$return_data = $return_data ? $return_data->$from : null;
+		}
 
 		if (method_exists($called_class, "ApiQuery_out_"))
 			$called_class::ApiQuery_out_();

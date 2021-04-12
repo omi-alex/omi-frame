@@ -74,6 +74,23 @@ function QQuery($query, $binds = null, QIModel $from = null, &$dataBlock = null,
 	return QModelQuery::BindQuery($query, $binds, $from, $dataBlock, $skip_security, $filter_selector, false, $storage);
 }
 
+function QQuery_First_By_Filter(string $collection, array $conditions = null, string $selector = "Id", QIModel $from = null, &$dataBlock = null, $skip_security = true, $filter_selector = null, \QIStorage $storage = null)
+{
+	$conditions_query = [];
+	$conditions_binds = [];
+	
+	foreach ($conditions ?: [] as $prop_name => $value)
+	{
+		$conditions_query[] = $prop_name."=?";
+		$conditions_binds[] = $value;
+	}
+	
+	$query = $collection.".{{$selector} ".($conditions_query ? " WHERE ".implode(" AND ", $conditions_query) : "")." LIMIT 1}";
+	$ret = \QQuery($query, $conditions_binds ?: null, $from, $dataBlock, $skip_security, $filter_selector, $storage);
+	
+	return isset($ret->{$collection}[0]) ? $ret->{$collection}[0] : null;
+}
+
 function QQueryProperty($property, $query, $binds = null, QIModel $from = null, &$dataBlock = null, $skip_security = true, $filter_selector = null)
 {
 	$data = QModelQuery::BindQuery($property.".{{$query}}", $binds, $from, $dataBlock, $skip_security, $filter_selector);

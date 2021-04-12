@@ -28,6 +28,9 @@ class QModelQuery
 	{
 		try
 		{
+			# if (defined('QQQ_START_Qsss') && QQQ_START_Qsss)
+			#	qvar_dumpk($query);
+			
 			# $t1_log = microtime(true);
 			
 			\QTrace::Begin_Trace([],
