@@ -75,4 +75,14 @@ class QViewBase extends QModel
 	public $dynamic_name;
 
 	public $_rf_args = [];
+	
+	/**
+	 * Sets the parent element for this instance
+	 * 
+	 * @param QViewBase $parent
+	 */
+	public function setParent(QViewBase $parent)
+	{
+		$this->parent = $parent;
+	}
 }

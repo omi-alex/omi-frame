@@ -158,5 +158,23 @@ class QModel implements QIModel
 	public static $Dump = false;
 	
 	public static $__Cache = null;
-	
+
+	/**
+	 * Sets the identifier of the object
+	 * 
+	 * @param integer|string $id
+	 */
+	public function setId($id, $check = true, $null_on_fail = false)
+	{
+		if (is_numeric($id))
+		{
+			$id = (int)$id;
+			if ($id === 0)
+				$id = null;
+		}
+		else if (is_string($id) && (($id === '') || ctype_space($id)))
+			$id = null;
+		$this->_id = $this->Id = $id;
+	}
 }
+
