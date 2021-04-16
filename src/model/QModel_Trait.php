@@ -2124,6 +2124,16 @@ trait QModel_Trait
 					{
 						$dest->{"_{$k}_"} = $v;
 					}
+					else if ($v === null)
+					{
+						# make sure we don't throw an error if null
+						# if ($v_dest !== null)
+						# $dest->{"set{$k}"}($v, false, true);
+						# @TODO - what do we do with integrity errors !!!
+						# product -> code / manuf
+						# if (\QAutoload::GetDevelopmentMode())
+						#	$dest->{"set{$k}"}($v);
+					}
 					else if ($v instanceof \QIModelArray)
 					{
 						if (!$v_dest instanceof \QIModelArray)

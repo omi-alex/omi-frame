@@ -74,6 +74,13 @@ function QQuery($query, $binds = null, QIModel $from = null, &$dataBlock = null,
 	return QModelQuery::BindQuery($query, $binds, $from, $dataBlock, $skip_security, $filter_selector, false, $storage);
 }
 
+function QQuery_By_Id(string $collection, int $id, string $selector = "Id", QIModel $from = null, &$dataBlock = null, $skip_security = true, $filter_selector = null, \QIStorage $storage = null)
+{
+	$query = $collection.".{{$selector} WHERE Id=? LIMIT 1}";
+	$ret = \QQuery($query, [$id] ?: null, $from, $dataBlock, $skip_security, $filter_selector, $storage);
+	return isset($ret->{$collection}[0]) ? $ret->{$collection}[0] : null;
+}
+
 function QQuery_First_By_Filter(string $collection, array $conditions = null, string $selector = "Id", QIModel $from = null, &$dataBlock = null, $skip_security = true, $filter_selector = null, \QIStorage $storage = null)
 {
 	$conditions_query = [];
@@ -2684,7 +2691,13 @@ function getDiffCaption($d1, $d2)
 	return $ret. " ago";
 }
 
-function qVarExport($data, $export_obj_nulls = false, \SplObjectStorage $refs = null, &$obj_count_index = 1)
+function q_var_export($data, bool $export_obj_nulls = false, bool $hide_array_keys = true)
+{
+	$obj_count_index = 1;
+	return qVarExport($data, $export_obj_nulls, null, $obj_count_index, $hide_array_keys, false);
+}
+
+function qVarExport($data, $export_obj_nulls = false, \SplObjectStorage $refs = null, &$obj_count_index = 1, bool $hide_array_keys = false, bool $new_lines = true)
 {
 	$ty = gettype($data);
 	switch($ty)
@@ -2700,9 +2713,17 @@ function qVarExport($data, $export_obj_nulls = false, \SplObjectStorage $refs = 
 			if ($refs === null)
 				$refs = new \SplObjectStorage();
 			$ret = "[";
+			$expected_k = 0;
 			foreach ($data as $k => $v)
-				$ret .= var_export($k, true) . "=>" . qVarExport($v, $export_obj_nulls, $refs, $obj_count_index).",";
-			$ret .= "]\n";
+			{
+				$use_expected = ($expected_k !== null) && ($expected_k === $k);
+				$ret .= (($hide_array_keys && $use_expected) ? '' : (var_export($k, true) . "=>")) . qVarExport($v, $export_obj_nulls, $refs, $obj_count_index, $hide_array_keys, $new_lines).",";
+				if ($use_expected)
+					$expected_k++;
+				else
+					$expected_k = null; # we break out
+			}
+			$ret .= "]".($new_lines ? "\n" : "");
 			return $ret;
 		}
 		case "object":
@@ -2722,9 +2743,9 @@ function qVarExport($data, $export_obj_nulls = false, \SplObjectStorage $refs = 
 				if ($is_qmodel && (($k === "_ty") || ($k === "_sc")))
 					continue;
 				if ((($v !== null) && ($v !== [])) || $export_obj_nulls)
-					$ret .= var_export($k, true) . "=>" . qVarExport($v, $export_obj_nulls, $refs, $obj_count_index) . ",";
+					$ret .= var_export($k, true) . "=>" . qVarExport($v, $export_obj_nulls, $refs, $obj_count_index, $hide_array_keys, $new_lines) . ",";
 			}
-			$ret .= "], \$refs)\n";
+			$ret .= "], \$refs)".($new_lines ? "\n" : "");
 			return $ret;
 		}
 		default:
@@ -2867,6 +2888,10 @@ function filePutContentsIfChanged_commit(bool $roolback = false)
 		{
 			# echo "Restore `{$file_path}` from ".filemtime($file_path)." TO {$file_m_time} <br/>\n";
 			touch($file_path, $file_m_time);
+		}
+		else
+		{
+			# echo "OK!<br/>\n";
 		}
 		# in all cases release the backup
 		unlink($file_path."._fpcic_bak");

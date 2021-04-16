@@ -1350,10 +1350,11 @@ class QMySqlStorage extends QSqlStorage
 		if ($explicit_selector)
 		{
 			$use_states = null;
-			$selector = [$from => $selector];
+			$selector = [$from => is_string($selector) ? qParseEntity($selector) : $selector];
 		}
 		
-		#														bool $trigger_provision = true, bool $trigger_events = true, bool $trigger_save = false, bool $trigger_import = false
+		#	bool $trigger_provision = true, bool $trigger_events = true, bool $trigger_save = false, bool $trigger_import = false
+		
 		$return_data = $model->save($selector, null, $use_states, true, true, false, true);
 
 		// $model->afterImport(true);
