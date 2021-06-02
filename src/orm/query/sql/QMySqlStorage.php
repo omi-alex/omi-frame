@@ -37,7 +37,8 @@ class QMySqlStorage extends QSqlStorage
 	{
 		if ($reconnect)
 			$this->disconnect();
-		$this->connection = new \QMySqlConnection($this->host, $this->user, $this->pass, $this->default_db, $this->port);
+		
+		$this->connection = new \QMySqlConnection($this->host, $this->user, $this->pass, $this->default_db, $this->port, $this->socket);
 	}
 
 	/**
@@ -1501,11 +1502,14 @@ class QMySqlStorage extends QSqlStorage
 		if (is_array($ids_list))
 		{
 			if (strpos($query, "??Id_IN?") === false)
+			{
+				if (\QAutoload::GetDevelopmentMode())
+				{
+					qvar_dumpk($query, $ids_list, $only_first, $from_type, $storage_model, $storage_model::GetSyncPropertyListingQuery($from), $from_type::GetListingSyncQuery());
+				}
 				throw new \Exception('Missing ??Id_IN? for `'.$from.'`');
+			}
 			$parameters['Id_IN'] = [$ids_list];
-			
-			# qvar_dumpk('$query', $query, $parameters);
-			
 		}
 		
 		if ($query_by_data_type)

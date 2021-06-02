@@ -13,7 +13,7 @@
  */
 class QSqlTable extends QStorageTable
 {
-	use QSqlTable_GenTrait;
+	use QSqlTable_GenTrait, QSqlTable_New;
 	
 	protected static $Max_Allowed_Packet;
 	protected static $_MergeByInfo = [];
@@ -191,6 +191,9 @@ class QSqlTable extends QStorageTable
 		$storage->begin();
 
 		$all_objects = array();
+		
+		$transaction_was_commited = false;
+		
 		try
 		{
 			if ($trigger_events || $trigger_provision)
@@ -199,7 +202,23 @@ class QSqlTable extends QStorageTable
 					$model->afterBeginTransaction($selector, ($transform_state !== null) ? $transform_state : ($model->_ts));
 			}
 			
-			$this->recurseTransactionList($mysqli, $model_list, $transform_state, $selector);
+			$m1 = memory_get_usage();
+			$t1 = microtime(true);
+			if (($selector !== true) && defined('QQQQQ_TEST_NEW_TRANSFORM') && QQQQQ_TEST_NEW_TRANSFORM && \QAutoload::GetDevelopmentMode())
+			{
+				$this->recurseTransactionList_New($mysqli, $model_list, $transform_state, $selector);
+				
+				$t2 = microtime(true);
+				$m2 = memory_get_usage();
+
+				/*qvar_dumpk("mem: " . round(($m2 - $m1) / 1024),
+						"time: " . round(($t2 - $t1), 5), $mysqli->_stats);*/
+			}
+			else
+			{
+				$this->recurseTransactionList($mysqli, $model_list, $transform_state, $selector);
+			}
+			
 			
 			if ($trigger_events || $trigger_provision)
 			{
@@ -208,6 +227,7 @@ class QSqlTable extends QStorageTable
 			}
 
 			$this->getStorage()->commit();
+			$transaction_was_commited = true;
 			
 			if ($trigger_import)
 			{
@@ -228,6 +248,12 @@ class QSqlTable extends QStorageTable
 		}
 		finally
 		{
+			if (!$transaction_was_commited)
+			{
+				$rc_rb = $this->getStorage()->rollback(); # make sure we rollback
+				# file_put_contents("test_alex_rollback_on_die.txt", "\n" . date('Y-m-d H:i:s') . ' | ' . json_encode(['rollback' => $rc_rb]), FILE_APPEND);
+			}
+			
 			\QModel::TransactionFlagEnd();
 			// do a cleanup
 			foreach ($all_objects as $obj)
@@ -1412,6 +1438,8 @@ class QSqlTable extends QStorageTable
 			// we only do it for global merge by
 			if (($model->getId() === null) && (!$parent_prop_merge_by) && ($type_mergeBy = static::GetMergeByInfo($class_name)))
 			{
+				# @TODO - $type_mergeBy + "shallow delete" ==> NOT GOOD !!! the deleted object will remain in the table , only 'de-linked'
+				
 				// global merge by
 				if ($property && ($app_property = $property->getAppPropertyFor($class_name)))
 					$class_property = $app_property;

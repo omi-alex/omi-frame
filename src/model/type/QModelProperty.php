@@ -821,13 +821,6 @@ final class QModelProperty
 	{
 		if (($app_prop = $this->_appProps[$class_name]) !== null)
 			return $app_prop ?: null;
-
-		/* @TODO
-		$inst_types = $this->getAllInstantiableReferenceTypes();
-		if (!$inst_types[$class_name])
-			// the type is not supported by the property
-			return null;
-		*/
 		
 		// if explicit
 		if (($app_prop = $this->storage["appProperty"]))

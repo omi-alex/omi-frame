@@ -254,6 +254,14 @@ class QApp extends QAppModule
 		$data->init();
 		return $data;
 	}
+	
+	/**
+	 * @return int
+	 */
+	public static function GetDataId(): int
+	{
+		return self::$DataId;
+	}
 
 	public static final function UnsetData()
 	{

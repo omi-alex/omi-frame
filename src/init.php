@@ -94,6 +94,10 @@ QAutoload::AddWatchFolder(Q_FRAME_PATH, false, "frame");
 set_error_handler(array("QErrorHandler", "HandleError"), E_ALL & ~(E_NOTICE | E_USER_NOTICE | E_STRICT | E_DEPRECATED));
 set_exception_handler(array("QErrorHandler", "UncaughtExceptionHandler"));
 register_shutdown_function(array("QErrorHandler", "OnShutdown"));
+register_shutdown_function(function () {
+	# yes, we need to make sure it runs last!
+	register_shutdown_function(['QErrorHandler', 'Cleanup_On_End']);
+});
 
 if (defined('Q_DEBUG_API_KEY') && (strlen(Q_DEBUG_API_KEY) >= 40) && (isset($_GET[Q_DEBUG_API_KEY]) || isset($_POST[Q_DEBUG_API_KEY])))
 {

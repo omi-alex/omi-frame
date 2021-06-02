@@ -2761,8 +2761,8 @@ abstract class QPHPToken
 		foreach ($predicates as $k => $p)
 			$predicates[$k] = str_replace(["@"], ["\\@"], $p);
 
-		$pred_exp = "(".implode("|", $predicates).")";
-		$reg_exp = "/{$pred_exp}(.*?)?(\\r?\\n|\$)|".
+		$pred_exp = "(".implode("\\b|", $predicates)."\\b)";
+		$reg_exp = "/{$pred_exp}(.*?)?(\\r?\\n|\$)".
 				// "(\\{\\{\\s*(?:.*?)\\s*\\}\\})". // matching vars
 				"/us";
 		

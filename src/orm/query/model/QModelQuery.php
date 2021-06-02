@@ -257,6 +257,8 @@ class QModelQuery
 				# Escaped identifiers have priority
 				"'(?:(?:[^\\\\\']+|(?:\\\\.)+)*)\'|". # string
 				"[-+]?(?:[0-9]*\.?[0-9]+|[0-9]+)|". # number (not full validation)
+				
+				"`(?:(?:[^\\\\\`]+|(?:\\\\.)+)*)\`|". # escaped identifier
 				// Keywords: AND/OR/...
 				"\bAS\b|\bSELECT\b|\bUPDATE\b|\bDELETE\b|\bINSERT\b|\bWHERE\b|\bORDER\\s+BY\b|\bHAVING\b|\bGROUP\\s+BY\b|\bAND\b|\bOR\b|\bBETWEEN\b|\bASC\b|\bDESC\b|\bLIMIT\b|".
 					"\bNULL\b|\bTRUE\b|\bFALSE\b|\bIS_A\b|\bIS\b|\bLIKE\b|\bCASE\b|\bBINARY\b|\bNOT\b|\bDIV\b|\bIS\\s*NULL\b|\bIS\\s*NOT\\s*NULL\b|\bSQL_CALC_FOUND_ROWS\b|".
