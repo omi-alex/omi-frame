@@ -423,7 +423,7 @@ class QSqlParserQuery
 		 * http://bugs.mysql.com/bug.php?id=18454
 		 */
 		// define("MYSQL_USE_SQL_CALC_FOUND_ROWS", true);
-		$exe_q = $this->toSQL((defined("MYSQL_USE_SQL_CALC_FOUND_ROWS") && MYSQL_USE_SQL_CALC_FOUND_ROWS) ? false : true);
+		$exe_q = $this->toSQL(defined("MYSQL_USE_SQL_CALC_FOUND_ROWS") ? MYSQL_USE_SQL_CALC_FOUND_ROWS : true);
 
 		if (false && \QAutoload::GetDevelopmentMode())
 		{
@@ -743,6 +743,11 @@ class QSqlParserQuery
 											$object->{"set{$prop_name}"}($prop_val, true, false);
 										else
 											$object->{$prop_name} = $prop_val;
+									}
+									else if (Q_FLAG_WAS_SET_FOR_NULLS && ($prop_val === null) && array_key_exists($prop_opts["\$"], $row) &&
+													(static::$SettersDefined[$object_class][$prop_name] ?? (static::$SettersDefined[$object_class][$prop_name] = method_exists($object, "set{$prop_name}"))))
+									{
+										$object->{"set{$prop_name}"}(null, true, false);
 									}
 								}
 								// reference

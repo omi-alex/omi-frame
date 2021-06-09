@@ -4,22 +4,53 @@ trait QSqlTable_New
 {
 	protected function recurseTransactionList_New($connection, array $model_list, $ts = null, $selector = null)
 	{
-		if ($selector === true)
-			throw new \Exception('Not implemented');
-		else if ($selector === null)
+		# if ($selector === true)
+		#	throw new \Exception('Not implemented');
+		if ($selector === null)
 			throw new \Exception('NULL SELECTOR ?!');
 		
-		# qvar_dumpk("BEFORE START: ".(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'])." sec");
+		### Merge By & Merch.Categ ... does not know how to merge by !!! --- options Pool !!! ---
+				# we need to test a joined merge-by - property level and App.property also
+				# also optimize if (property level === App.property)
+		
+		## !!! scalar collections !!!! ONE TO MANY & MANY TO MANY !!!!
+		## Mixed many to many with one to many ... using many to many to cross over collections
+		## Set backref with multiple types | ??? is it possible ?
+		
+		# what if we store Services/Products on different tables and have a collection on them ?!
+							# will it be the same collection table ? it should if on the same definition ... needs testing !
+							# test 1toM/M2M - INSERT / UPDATE / DELETE
+		# test that ids are unique inside a collection without a merge by !?
+		
+		# merge by - defined at prop lvl but not in APP ?! - good/bad ?!
+		
+		# PERFORMANCE :: GROUP UPDATE/INSERT/DELETE on the same level
 		
 		/**
 		 * @TODO
+		 *		- !!!! Simplify setBackReference !!! some kind of callback based on an object's reference || watch out for merge by
+		 *				- optimise to do less updates/inserts
 		 *		- merge by should be fine now but it needs more tests !
-		 *		- $selector = true
-		 *		- one2one
-		 *		- REAL DELETE OF RECORDS BASED ON CONFIG
+		 *		- [done - must @test] $selector = true - infinite loop !!! make sure we don't repeat !
+		 *		- [@test + add resolveOneToOneOps] one2one
+		 *		- [stage 2] REAL DELETE OF RECORDS BASED ON CONFIG
 		 *		- populate before insert | @storage.populateBeforeInsert | populate before insert as a way to merge by on a reference
 		 *		- all other @TODO s
+		 * 
+		 *		- if we run just a delete via ($array->setTransformState(\QModel::TransformDelete, $pos)), 
+		 *				the system will do a merge on the elements inside after the delete ... solutions ?
+		 *		- test with multiple DBs !
 		 */
+		
+		/**
+		 * @TESTING
+		 *		- collection many to many
+		 *		- walk code bit by bit and test it
+		 *		- test various cases
+		 * 
+		 * 
+		 */
+		
 		
 		# Removed :: beforeTransformModelByContainer
 
@@ -30,6 +61,7 @@ trait QSqlTable_New
 			throw new \Exception($connection->error);
 		qvar_dumpk('SELECT @@autocommit', $res->fetch_row());
 		*/
+
 		$t1 = microtime(true);
 				
 		# function toJSON($selector = null, $include_nonmodel_properties = false, $with_type = true, $with_hidden_ids = true, $ignore_nulls = true, &$refs = null, &$refs_no_class = null)
@@ -76,14 +108,27 @@ trait QSqlTable_New
 		$loop_lists = [];
 		$backrefs_list = [];
 		
+		$locked_objects = [];
+		$merge_by_pool = [];
+		
+		$arr = \QSqlModelInfoType::GetTablePropertyList();
+		$table_to_properties = [];
+		foreach ($arr as $k => $v)
+			$table_to_properties[$v][$k] = $k;
+		
 		$ticks = 0;
 		$m1 = memory_get_usage();
 		$t1 = microtime(true);
-		static::recurseObjects_New($backrefs_list, $connection, $this->getStorage(), $ts, $loop_lists, $process_objects, $selector, "", $ticks);
+		static::recurseObjects_New($backrefs_list, $connection, $this->getStorage(), $ts, $loop_lists, 
+										$process_objects, $selector, "", $ticks, $locked_objects, $merge_by_pool, $table_to_properties);
 		$t2 = microtime(true);
 		$m2 = memory_get_usage();
 		
-		$this->resolveBackrefs_NEW($backrefs_list);
+		unset($merge_by_pool);
+		# $this->resolveBackrefs_NEW($backrefs_list);
+		
+		foreach ($locked_objects as $lo)
+			unset($lo->_lk);
 		
 		# $connection->query("COMMIT;");
 		
@@ -107,11 +152,22 @@ trait QSqlTable_New
 		# die("aaa");
 	}
 	
-	protected static function recurseObjects_New(array &$backrefs_list, $connection, $storage, $ts, array &$loop_lists, SplObjectStorage $process_objects, $selector = null, string $path = '', int &$ticks = 0)
+	protected static function recurseObjects_New(array &$backrefs_list, $connection, $storage, $ts, array &$loop_lists, 
+					SplObjectStorage $process_objects, $selector = null, string $path = '', int &$ticks = 0, 
+					array &$locked_objects = null, array &$merge_by_pool = null, array $table_to_properties = null)
 	{
+		# qvar_dumpk("PATH :: ".$path);
+		
 		$new_loop_list = []; # by path / type
 		$new_loop_list_coll = [];
 		$next_recurse_list = [];
+		
+		if ($selector === null)
+			$selector = [];
+		
+		$cached_type_props = [];
+		
+		# qvar_dumpk('$selector :: '.qImplodeEntity($selector));
 		
 		foreach ($process_objects as $model_object)
 		{
@@ -120,10 +176,13 @@ trait QSqlTable_New
 			$po_info = $process_objects->getInfo();
 			$new_loop_list[$po_info[2] ?: 0][$model_class][] = $po_info; # who was his parent ?! $property ... can be extracted from a QModelArray, 
 			# $model_id = $model_object->_id ?: $model_object->Id;
+			$model_properties = $cached_type_props[$model_class] ?: ($cached_type_props[$model_class] = \QModel::GetTypeByName($model_class)->properties);
 			
-			foreach ($selector ?: [] as $k => $sub_sel)
+			$loop_over = ($selector === true) ? $model_properties : $selector;
+			
+			foreach ($loop_over as $k => $sub_sel_or_val)
 			{
-				$val = $model_object->$k;
+				$val = ($selector === true) ? $sub_sel_or_val : $model_object->$k;
 				
 				if ($val instanceof \QIModel)
 				{
@@ -132,6 +191,13 @@ trait QSqlTable_New
 						$next_recurse_list[$k] = new SplObjectStorage();
 					$next_recurse_list[$k][$val] = [$val, $model_object, $k];
 					*/
+					if ($selector === true)
+					{
+						if ($val->_lk)
+							continue;
+						$val->_lk = true;
+						$locked_objects[] = $val;
+					}
 					
 					$ticks++;
 					
@@ -141,9 +207,10 @@ trait QSqlTable_New
 							$val->setModelProperty($k, $model_object);
 						
 						$new_loop_list_coll[$model_class][$k][] = [$val, $model_object, $k];
+						# qvar_dumpk('$new_loop_list_coll', $new_loop_list_coll);
 						
 						$k_is_null = ($next_recurse_list[$k."[]"] === null);
-						foreach ($val as $v)
+						foreach ($val as $coll_val_key => $v)
 						{
 							if ($v instanceof \QIModel)
 							{
@@ -164,6 +231,11 @@ trait QSqlTable_New
 								
 								$ticks++;
 							}
+							# else
+							# {
+								# $next_recurse_list[$k."[]"][] = [$v, ($ts ?? $val->getTransformState($coll_val_key)), $model_class, $model_object]; # ??? dono
+								# $ticks++;
+							# }
 						}
 					}
 					else
@@ -176,24 +248,32 @@ trait QSqlTable_New
 			}
 		}
 		
+		$transaction_elems = [];
+		
 		if ($new_loop_list)
 		{
-			# qvar_dumpk('$new_loop_list KEYS', array_keys($new_loop_list));
+			# qvar_dumpk('$new_loop_list KEYS', $new_loop_list);
 			foreach ($new_loop_list as $parent_class_name_or_zero => $exec_items_list)
 			{
 				foreach ($exec_items_list as $class_name => $exec_items)
 				{
 					if ($exec_items)
 					{
-						$connection->_stats->queries[] = "# {$path} :: {$class_name} ========================================================== ";
+						# qvar_dumpk("# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ");
+						$connection->_stats->queries[] = "# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ";
 						$transaction_item = new QSqlTable_Titem($path, $exec_items, $connection, $storage, $selector, $ts, $class_name, false);
-						$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero);
+						$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero, $merge_by_pool);
+						
+						if ($transaction_item->backrefs_list)
+							$transaction_elems[] = $transaction_item;
 					}
 				}
 			}
 		}
+
 		if ($new_loop_list_coll)
 		{
+			# qvar_dumpk('$new_loop_list_coll KEYS', $new_loop_list_coll);
 			foreach ($new_loop_list_coll as $parent_class_name => $deep_items)
 			{
 				foreach ($deep_items as $prop_name => $exec_items)
@@ -201,9 +281,14 @@ trait QSqlTable_New
 					if ($exec_items)
 					{
 						$coll_path = $path ? ($path.".".$prop_name) : $prop_name;
+						# qvar_dumpk("# {$coll_path} :: {$parent_class_name} / {$prop_name} ========================================================== ");
 						$connection->_stats->queries[] = "# {$coll_path} :: {$parent_class_name} / {$prop_name} ========================================================== ";
+						
 						$transaction_item_coll = new QSqlTable_Titem($coll_path, $exec_items, $connection, $storage, $selector, $ts, null, true, $parent_class_name, $prop_name);
-						$transaction_item_coll->run_collection($backrefs_list);
+						$transaction_item_coll->run_collection($backrefs_list, $table_to_properties);
+					
+						if ($transaction_item_coll->backrefs_list)
+							$transaction_elems[] = $transaction_item_coll;
 					}
 				}
 			}
@@ -211,8 +296,14 @@ trait QSqlTable_New
 		
 		foreach ($next_recurse_list as $k => $list)
 		{
-			$sub_sel = (substr($k, -2, 2) === '[]') ? $selector[substr($k, 0, -2)] : $selector[$k];
-			static::recurseObjects_New($backrefs_list, $connection, $storage, $ts, $loop_lists, $list, $sub_sel, $path ? $path.".".$k : $k, $ticks);
+			$sub_sel = ($selector === true) ? true : ((substr($k, -2, 2) === '[]') ? $selector[substr($k, 0, -2)] : $selector[$k]);
+			static::recurseObjects_New($backrefs_list, $connection, $storage, $ts, $loop_lists, $list, $sub_sel, 
+						$path ? $path.".".$k : $k, $ticks, $locked_objects, $merge_by_pool, $table_to_properties);
+		}
+		
+		foreach ($transaction_elems as $transaction_e)
+		{
+			$transaction_e->resolveBackrefs_NEW();
 		}
 	}
 	
@@ -356,75 +447,5 @@ trait QSqlTable_New
 		# static::test_multi_updates($rand_ops, $bulk_ops_types);
 		
 		return $rand_ops;
-	}
-	
-	protected function resolveBackrefs_NEW(array $backrefs_list)
-	{
-		$storage = $this->getStorage();
-		$connection = $storage->connection;
-		$cols_type_inf = QSqlModelInfoType::GetColumnsTypeInfo();
-			
-		// $tx = microtime(true);
-		foreach ($backrefs_list as $data)
-		{
-			list($sql_info, $update_column, $reference, $row_identifier, $model_array, $model_array_key) = reset($data);
-
-			$cols_ty_tab = $cols_type_inf[str_replace("`", "",$sql_info["tab"])];
-
-			$parts = array();
-			# $yield_obj_binds = [];
-			
-			foreach ($data as $info)
-			{
-				list(/* ignore sql info */, $update_column, $reference) = $info;
-				if ($update_column === null)
-				{
-					continue;
-				}
-				
-				$reference_id = $reference->getId();
-				$reference_id_str = ($reference_id === null) ? 'NULL' : (string)$reference_id;
-				$parts[] = "`{$update_column}`={$reference_id_str}";
-				# $yield_obj_binds[] = $reference->getId();
-
-				// var_dump($zzz_sql_info["tab"]." :: ". ($my_row_identifier instanceof QIModel ? $my_row_identifier->getId() : $my_row_identifier));
-
-				$cols_ty_col = $cols_ty_tab ? ($cols_ty_tab[$update_column] ?: $cols_ty_tab[substr($update_column, strlen(QORM_TYCOLPREFIX))]) : null;
-
-				// var_dump($my_sql_info["tab"], $my_sql_info["id_col"], $update_column, $reference->getId(), get_class($reference));
-
-				if (is_string($cols_ty_col) && ($reference instanceof QIModel))
-				{
-					$bkref_type = $storage->getTypeIdInStorage(get_class($reference));
-					$bkref_type_str = ($bkref_type === null) ? 'NULL' : (string)$bkref_type;
-					$parts[] = "`{$cols_ty_col}`={$bkref_type_str}";
-					# $yield_obj_binds[] = $bkref_type;
-					// var_dump($cols_ty_col, $bkref_type);
-				}
-			}
-
-			// for many to many collections we may need to setup the type, check before we do this update
-
-			$row_id = (($row_identifier instanceof QIModel) ? $row_identifier->getId() : $row_identifier);
-			
-			if ($parts && $row_id)
-			{
-				// $query = "UPDATE ".$sql_info["tab"]." SET ".implode(",", $parts)." WHERE `{$sql_info["id_col"]}`=".$row_id;
-				
-				$yield_obj_q = "UPDATE ".$sql_info["tab"]." SET ".implode(",", $parts)." WHERE `{$sql_info["id_col"]}`={$row_id};";
-				$rc = $connection->query($yield_obj_q);
-				if (!$rc)
-					throw new \Exception($connection->error);
-			}
-			else
-			{
-				if (\QAutoload::GetDevelopmentMode())
-					qvar_dumpk('$parts && $row_id', $parts, $row_id, $row_identifier);
-				throw new Exception("Empty parts");
-			}
-
-			if ($model_array && ($model_array_key !== null))
-				$model_array->setRowIdAtIndex($model_array_key, $row_id);
-		}
 	}
 }

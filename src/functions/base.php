@@ -1739,8 +1739,7 @@ function qDebugStackInner($args, $with_stack = false, $on_shutdown = false, stri
 	
 	$css_class = "_dbg_".uniqid();
 	
-	?><div class="<?= $css_class ?>">
-		<script type="text/javascript">
+	?><div class="<?= $css_class ?>"><script type="text/javascript">
 			if (!window._dbgFuncToggleNext)
 			{
 				window._dbgFuncToggleNext = function(dom_elem)
@@ -1758,8 +1757,7 @@ function qDebugStackInner($args, $with_stack = false, $on_shutdown = false, stri
 						next.style.display = 'block';
 				};
 			}
-		</script>
-	<style type="text/css">
+		</script><style type="text/css">
 		
 		div.<?= $css_class ?> {
 			font-family: monospace;
@@ -1834,8 +1832,7 @@ function qDebugStackInner($args, $with_stack = false, $on_shutdown = false, stri
 			color: orange;
 		}
 		
-	</style>
-	<?php
+	</style><?php
 
 	$stack = debug_backtrace();
 	// remove this call
@@ -2496,6 +2493,7 @@ function qIntersectSelectorsRec($selector_1, $selector_2)
 		else 
 		{
 			// there is no * on eiter side
+			# !!!! PLEASE RESPECT THE ORDER HERE SO WE CAN INTERSECT AND COMPARE
 			foreach ($selector_1 ?: [] as $k => $v)
 			{
 				if (($sv = $selector_2[$k]) !== null)

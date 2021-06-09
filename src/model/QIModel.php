@@ -119,6 +119,8 @@ interface QIModel
 	 * $_ols The old, changed values
 	 * 
 	 * $_lk True if the object is locked
+	 * 
+	 * $_mbykey_ = merge by keys list
 	 */
 	
 	/**
