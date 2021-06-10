@@ -40,6 +40,8 @@ trait QSqlTable_New
 		 *		- if we run just a delete via ($array->setTransformState(\QModel::TransformDelete, $pos)), 
 		 *				the system will do a merge on the elements inside after the delete ... solutions ?
 		 *		- test with multiple DBs !
+		 * 
+		 *		- if a collection is NOT storage options pool - default it to one to many ?! - @TBD
 		 */
 		
 		/**
@@ -77,7 +79,7 @@ trait QSqlTable_New
 			if ($obj instanceof \QIModelArray)
 			{
 				# @TODO - check propery and parent model
-				throw new \Exception('@TODO - check propery and parent model');
+				throw new \Exception('@TODO - check propery and parent model (A)');
 				
 				/*
 				foreach ($obj as $v)
@@ -91,6 +93,8 @@ trait QSqlTable_New
 			}
 			else if ($obj instanceof \QIModel)
 				$process_objects[$obj] = [$obj, ($ts ?? ($obj->_ts ?? QModel::TransformMerge)), null]; # object, parent, property
+			else
+				throw new \Exception('Not a model.');
 		}
 				
 		# we prepare the info ... so then we can call `recurseTransaction` in a loop per level / (?type - or no type) 

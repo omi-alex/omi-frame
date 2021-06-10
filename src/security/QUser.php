@@ -30,7 +30,7 @@ class QUser extends QModel
 	protected $Username;
 	/**
 	 * @storage.index unique
-	 * @validation mandatory
+	 * 
 	 * @var string
 	 */
 	protected $Email;

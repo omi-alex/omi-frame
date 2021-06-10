@@ -1,5 +1,4 @@
 <?php
-
 /**
  * 
  */
@@ -576,14 +575,13 @@ final class QSqlTable_Titem
 				{
 					# If we implement multiple collections to the same M2M table ... we will need to do some testing
 					#			most notably on the DELETE SIDE !!! & then cleanup
-					throw new \Exception('Multiple collections to the same many to many table is not implemented. '.$sql_info_tab);
+					throw new \Exception('Multiple collections inside the same many to many table is not implemented. '.$sql_info_tab);
 				}
 			}
 		}
 		
 		# LOAD EXISTING DATA
 		$find_by_uniqueness = (!$one_to_many) && $property->getCollectionType()->hasAnyInstantiableReferenceTypes();
-		# qvar_dumpk('$find_by_uniqueness', $property->name, $find_by_uniqueness);
 		
 		$reading_queries_by_rowid = [];
 		$reading_queries_by_uniqn = [];
