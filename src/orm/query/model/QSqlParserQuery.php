@@ -744,9 +744,10 @@ class QSqlParserQuery
 										else
 											$object->{$prop_name} = $prop_val;
 									}
-									else if (Q_FLAG_WAS_SET_FOR_NULLS && ($prop_val === null) && array_key_exists($prop_opts["\$"], $row) &&
+									else if (defined('Q_FLAG_WAS_SET_FOR_NULLS') && Q_FLAG_WAS_SET_FOR_NULLS && ($prop_val === null) && array_key_exists($prop_opts["\$"], $row) &&
 													(static::$SettersDefined[$object_class][$prop_name] ?? (static::$SettersDefined[$object_class][$prop_name] = method_exists($object, "set{$prop_name}"))))
 									{
+										# public function setId($id, $check = true, $null_on_fail = false)
 										$object->{"set{$prop_name}"}(null, true, false);
 									}
 								}
