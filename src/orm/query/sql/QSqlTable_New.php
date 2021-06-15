@@ -9,27 +9,30 @@ trait QSqlTable_New
 		if ($selector === null)
 			throw new \Exception('NULL SELECTOR ?!');
 		
-		### Merge By & Merch.Categ ... does not know how to merge by !!! --- options Pool !!! ---
-				# we need to test a joined merge-by - property level and App.property also
-				# also optimize if (property level === App.property)
-		
-		## !!! scalar collections !!!! ONE TO MANY & MANY TO MANY !!!!
-		## Mixed many to many with one to many ... using many to many to cross over collections
-		## Set backref with multiple types | ??? is it possible ?
+		# @TODO - test merge by overwrtite at non-app property level
+				# merge by - defined at prop lvl but not in APP ?! - good/bad ?!
+				# - if a collection is NOT storage options pool - default it to one to many ?! - @TBD
+				# IF NOT @storage.optionsPool - do not merge by
 		
 		# what if we store Services/Products on different tables and have a collection on them ?!
 							# will it be the same collection table ? it should if on the same definition ... needs testing !
 							# test 1toM/M2M - INSERT / UPDATE / DELETE
+
 		# test that ids are unique inside a collection without a merge by !?
-		
-		# merge by - defined at prop lvl but not in APP ?! - good/bad ?!
 		
 		# PERFORMANCE :: GROUP UPDATE/INSERT/DELETE on the same level
 		
+		# test merge by on a Tree structure with both one to many and many to many !
+		#					merge by : parent.name
+		#					IF Owner.Id - was not set ?! - must not throw an error !
+		#					merge by 'Owner' - without ID in the future, and include both Id&Type
+		#					
+		#					
+		# replace flag for non-collection - all props that are not send are set to their defaults !
+		
 		/**
 		 * @TODO
-		 *		- !!!! Simplify setBackReference !!! some kind of callback based on an object's reference || watch out for merge by
-		 *				- optimise to do less updates/inserts
+		 *		setBackReference::	- optimise to do less updates/inserts
 		 *		- merge by should be fine now but it needs more tests !
 		 *		- [done - must @test] $selector = true - infinite loop !!! make sure we don't repeat !
 		 *		- [@test + add resolveOneToOneOps] one2one
@@ -40,8 +43,6 @@ trait QSqlTable_New
 		 *		- if we run just a delete via ($array->setTransformState(\QModel::TransformDelete, $pos)), 
 		 *				the system will do a merge on the elements inside after the delete ... solutions ?
 		 *		- test with multiple DBs !
-		 * 
-		 *		- if a collection is NOT storage options pool - default it to one to many ?! - @TBD
 		 */
 		
 		/**
@@ -49,24 +50,15 @@ trait QSqlTable_New
 		 *		- collection many to many
 		 *		- walk code bit by bit and test it
 		 *		- test various cases
-		 * 
-		 * 
 		 */
 		
+		# @TODO - once we update a record ... do we update existing records ?!!
+		
+		# @TODO ability to re-map a record to another
 		
 		# Removed :: beforeTransformModelByContainer
 
-		# qvar_dumpk($model_list);
-		/*
-		$res = $connection->query('SELECT @@autocommit');
-		if (!$res)
-			throw new \Exception($connection->error);
-		qvar_dumpk('SELECT @@autocommit', $res->fetch_row());
-		*/
-
 		$t1 = microtime(true);
-				
-		# function toJSON($selector = null, $include_nonmodel_properties = false, $with_type = true, $with_hidden_ids = true, $ignore_nulls = true, &$refs = null, &$refs_no_class = null)
 		
 		$max_row = static::$Max_Allowed_Packet ?: (static::$Max_Allowed_Packet = $connection->query("SHOW VARIABLES LIKE 'max_allowed_packet';")->fetch_assoc());
 		$max_query_len = $max_row["Value"] ?: next($max_row) ?: $max_query_len;
@@ -114,6 +106,9 @@ trait QSqlTable_New
 		
 		$locked_objects = [];
 		$merge_by_pool = [];
+		$merge_by_linked = [];
+		$merge_by_posib_not_linked = [];
+		$existing_records_global = [];
 		
 		$arr = \QSqlModelInfoType::GetTablePropertyList();
 		$table_to_properties = [];
@@ -124,10 +119,63 @@ trait QSqlTable_New
 		$m1 = memory_get_usage();
 		$t1 = microtime(true);
 		static::recurseObjects_New($backrefs_list, $connection, $this->getStorage(), $ts, $loop_lists, 
-										$process_objects, $selector, "", $ticks, $locked_objects, $merge_by_pool, $table_to_properties);
+										$process_objects, $selector, "", $ticks, $locked_objects, $existing_records_global, $merge_by_pool, $merge_by_linked, 
+										$merge_by_posib_not_linked, $table_to_properties);
+		
+		# qvar_dumpk('$merge_by_linked', $merge_by_linked, '$merge_by_posib_not_linked', $merge_by_posib_not_linked);
+		
+		if ($merge_by_posib_not_linked)
+		{
+			$tmp_app = null;
+			$tmp_mby_not_linked_selector = [];
+			foreach ($merge_by_posib_not_linked as $prop_class => $prop_elems)
+			{
+				foreach ($prop_elems as $prop_elem_id => $prop_collection_data)
+				{
+					foreach ($prop_collection_data as $prop_name => $collection_items)
+					{
+						$not_linked = ($tmp_linked = $merge_by_linked[$prop_class][$prop_elem_id][$prop_name]) ? array_diff_key($collection_items, $tmp_linked) : $collection_items;
+						if ($not_linked)
+						{
+							if ($tmp_app === null)
+							{
+								$tmp_app = new $prop_class();
+								$tmp_app->setId($prop_elem_id);
+							}
+							$tmp_mby_not_linked_selector[$prop_name] = [];
+							if (!$tmp_app->$prop_name)
+								$tmp_app->$prop_name = new \QModelArray(array_values($not_linked));
+							else
+							{
+								foreach ($not_linked as $nl_val)
+									$tmp_app->$prop_name[] = $nl_val;
+							}
+						}
+					}
+				}
+			}
+			
+			if ($tmp_app && $tmp_mby_not_linked_selector)
+			{
+				$loop_lists_mby_not_linked = [];
+				$process_objects_mby_not_linked = new \SplObjectStorage();
+				$process_objects_mby_not_linked[$tmp_app] = [$tmp_app, QModel::TransformMerge, null]; # object, parent, property
+				$locked_objects_tmp = [];
+				
+				static::recurseObjects_New($backrefs_list, $connection, $this->getStorage(), null, $loop_lists_mby_not_linked, 
+						$process_objects_mby_not_linked, $tmp_mby_not_linked_selector, "", $ticks, $locked_objects_tmp, 
+						$existing_records_global, $merge_by_pool, $merge_by_linked, 
+						$merge_by_posib_not_linked, $table_to_properties);
+				
+				foreach ($locked_objects_tmp as $lo)
+					unset($lo->_lk);
+			}
+		}
+		
 		$t2 = microtime(true);
 		$m2 = memory_get_usage();
 		
+		# qvar_dumpk('$merge_by_pool', $merge_by_pool, '$merge_by_linked', $merge_by_linked, '$merge_by_posib_not_linked', $merge_by_posib_not_linked);
 		unset($merge_by_pool);
 		# $this->resolveBackrefs_NEW($backrefs_list);
 		
@@ -158,7 +206,8 @@ trait QSqlTable_New
 	
 	protected static function recurseObjects_New(array &$backrefs_list, $connection, $storage, $ts, array &$loop_lists, 
 					SplObjectStorage $process_objects, $selector = null, string $path = '', int &$ticks = 0, 
-					array &$locked_objects = null, array &$merge_by_pool = null, array $table_to_properties = null)
+					array &$locked_objects = null, array &$existing_records_global, array &$merge_by_pool = null,
+					array &$merge_by_linked = null, array &$merge_by_posib_not_linked = null, array $table_to_properties = null)
 	{
 		# qvar_dumpk("PATH :: ".$path);
 		
@@ -254,6 +303,8 @@ trait QSqlTable_New
 		
 		$transaction_elems = [];
 		
+		# $extend_selector = null;
+		
 		if ($new_loop_list)
 		{
 			# qvar_dumpk('$new_loop_list KEYS', $new_loop_list);
@@ -266,17 +317,33 @@ trait QSqlTable_New
 						# qvar_dumpk("# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ");
 						$connection->_stats->queries[] = "# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ";
 						$transaction_item = new QSqlTable_Titem($path, $exec_items, $connection, $storage, $selector, $ts, $class_name, false);
-						$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero, $merge_by_pool);
-						
+						/*list($extend_selector_tmp, ) = */
+						$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked);
+						# if ($extend_selector_tmp)
+						# 	$extend_selector = $extend_selector ? qJoinSelectors($extend_selector, $extend_selector_tmp) : $extend_selector_tmp;
+
 						if ($transaction_item->backrefs_list)
 							$transaction_elems[] = $transaction_item;
 					}
 				}
 			}
 		}
-
+		
+		# if ($extend_selector)
+			# atm needed for oneToOne
+		#	$selector = qJoinSelectors($selector, $extend_selector);
+	
+		foreach ($next_recurse_list as $k => $list)
+		{
+			$sub_sel = ($selector === true) ? true : ((substr($k, -2, 2) === '[]') ? $selector[substr($k, 0, -2)] : $selector[$k]);
+			static::recurseObjects_New($backrefs_list, $connection, $storage, $ts, $loop_lists, $list, $sub_sel, 
+						$path ? $path.".".$k : $k, $ticks, $locked_objects, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked, $table_to_properties);
+		}
+		
 		if ($new_loop_list_coll)
 		{
+			# @TODO - ideally we should run this earlier, after the models inside it run
+			
 			# qvar_dumpk('$new_loop_list_coll KEYS', $new_loop_list_coll);
 			foreach ($new_loop_list_coll as $parent_class_name => $deep_items)
 			{
@@ -297,14 +364,7 @@ trait QSqlTable_New
 				}
 			}
 		}
-		
-		foreach ($next_recurse_list as $k => $list)
-		{
-			$sub_sel = ($selector === true) ? true : ((substr($k, -2, 2) === '[]') ? $selector[substr($k, 0, -2)] : $selector[$k]);
-			static::recurseObjects_New($backrefs_list, $connection, $storage, $ts, $loop_lists, $list, $sub_sel, 
-						$path ? $path.".".$k : $k, $ticks, $locked_objects, $merge_by_pool, $table_to_properties);
-		}
-		
+				
 		foreach ($transaction_elems as $transaction_e)
 		{
 			$transaction_e->resolveBackrefs_NEW();

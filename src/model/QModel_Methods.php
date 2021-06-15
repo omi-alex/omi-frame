@@ -4885,5 +4885,9 @@ trait QModel_Methods
 	
 	// add lines from here on
 
+	public function get_Type_Id()
+	{
+		return $this->_tid ?? ($this->_tid = (\QApp::GetStorage()->getTypeIdInStorage(get_class($this)) ?? false));
+	}
 }
 

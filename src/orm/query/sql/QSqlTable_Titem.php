@@ -41,17 +41,16 @@ final class QSqlTable_Titem
 		$this->is_collection = $is_collection;
 	}
 	
-	public function run_model(array &$backrefs_list, string $parent_class_name_or_zero, array &$merge_by_pool)
+	public function run_model(array &$backrefs_list, string $parent_class_name_or_zero, array &$existing_records_global, array &$merge_by_pool, array &$merge_by_linked, array &$merge_by_posib_not_linked)
 	{
 		# qvar_dumpk('$parent_class_name_or_zero', $parent_class_name_or_zero);
+		# qvar_dumpk($this->path." : count(".count($this->items).")");
 		
 		$ts = $this->ts;
 		$class_name = $this->class_name;
 		$this->model_type = \QModel::GetTypeByName($class_name);
 		$app_class_name = get_class(QApp::Data());
 		$is_top_lvl_class = ($class_name === $app_class_name);
-		
-		# assert all
 		
 		# we know it's class, parent class, and property ... determine all mergeBy info
 		
@@ -90,60 +89,98 @@ final class QSqlTable_Titem
 		# if (!$parent_property_is_collection)
 		#	$merge_by_meta = false;
 		
+		$is_collection_on_top_level = ($parent_class_name_or_zero === $app_class_name) && 
+										$parent_type_obj->properties[$parent_property_name]->hasCollectionType();
+		
+		$walk_struct = null;
+		
+		# if ($merge_by_meta === null) # always here
+		{
+			$parent_property_obj = null;
+			if ($parent_class_name_or_zero && $parent_property_name)
+			{
+				$parent_property_obj = $parent_props_cache[$parent_class_name_or_zero];
+				if ($parent_property_obj === null)
+				{
+					$parent_type = $parent_types_cache[$parent_class_name_or_zero];
+					if ($parent_type === null)
+						$parent_types_cache[$parent_class_name_or_zero] = $parent_type = ($parent_type_obj ?: false);
+					$parent_props_cache[$parent_class_name_or_zero] = $parent_property_obj = ($parent_type->properties[$parent_property_name] ?: false);
+				}
+			}
+
+			$merge_by_meta = $this->get_mergeby_meta($class_name, $parent_property_name, $parent_class_name_or_zero, $parent_property_obj ?: null);
+			# if ($merge_by_meta === false)
+			#	continue;
+		}
+		
+		$selector_for_mergeby_was_checked = false;
 		# $t1 = microtime(true);
 		foreach ($this->items as $model_inf)
 		{
 			# @TODO - merge by rules also !
 			list ($model, /*$action*/, /*$parent_model_class */, $parent_model_object) = $model_inf;
 			$model_id = (int)$model->getId() ?: null;
+			
 			if ($model_id)
 				$ids_to_q[$model_id] = $model_id;
 			else if ($merge_by_meta !== false)
 			{
-				if ($merge_by_meta === null)
+				if (!$selector_for_mergeby_was_checked)
 				{
-					$parent_property_obj = null;
-					if ($parent_class_name_or_zero && $parent_property_name)
-					{
-						$parent_property_obj = $parent_props_cache[$parent_class_name_or_zero];
-						if ($parent_property_obj === null)
-						{
-							$parent_type = $parent_types_cache[$parent_class_name_or_zero];
-							if ($parent_type === null)
-								$parent_types_cache[$parent_class_name_or_zero] = $parent_type = ($parent_type_obj ?: false);
-							$parent_props_cache[$parent_class_name_or_zero] = $parent_property_obj = ($parent_type->properties[$parent_property_name] ?: false);
-						}
-					}
-					
-					$merge_by_meta = $this->get_mergeby_meta($class_name, $parent_property_name, $parent_class_name_or_zero, $parent_property_obj ?: null);
-					if ($merge_by_meta === false)
-						continue;
-										
 					if (!empty($merge_by_meta))
 					{
 						# Merge by properties must be in the save selector for elements without an id
 						if (empty($selector))
+						{
+							# qvar_dumpk($this->path, $merge_by_meta);
 							throw new \Exception('Merge by properties must be in the save selector for elements without an id (A).');
+						}
 						else if ($selector !== true)
 						{
 							foreach ($merge_by_meta as $merge_by_meta_sel => $merge_by_meta_misc)
 							{
 								if (qSelectorsMissing($selector, $merge_by_meta_sel))
+								{
+									qvar_dumpk($this->path, $selector, $merge_by_meta_sel);
 									throw new \Exception('Merge by properties must be in the save selector for elements without an id (B).');
+								}
 							}
 						}
 					}
+					$selector_for_mergeby_was_checked = true;
 				}
 				
-				$this->get_mergeby_data($merge_by_meta, $merge_by_data, $merge_by_find, $merge_by_pool, $model, $parent_class_name_or_zero, $parent_model_object, $parent_property_name);
-				# qvar_dumpk($merge_by_find);
+				$this->get_mergeby_data($merge_by_meta, $merge_by_data, $merge_by_find, $merge_by_pool, $merge_by_linked, $is_collection_on_top_level, $model, $parent_class_name_or_zero, $parent_model_object, $parent_property_name);
+			}
+			
+			if ($is_collection_on_top_level && $merge_by_meta)
+			{
+				$mby_key = $model->_gp[0];
+				if ($mby_key)
+				{
+					$mby_key = $mby_key[2] ?: $mby_key[1];	
+				}
+				else
+				{
+					if (!$walk_struct)
+						$walk_struct = reset($merge_by_meta)[0];
+					list (/*$data, */$valid, $mby_key) = $this->extract_data_from_path($walk_struct, $model);
+					if (!$valid)
+						throw new \Exception('The object does not have all data for merge by (B): '.reset($merge_by_meta)[6].' | '.$mby_key);
+				}
+				
+				$merge_by_linked[$parent_class_name_or_zero][$parent_model_object->getId()][$parent_property_name][$mby_key] = true;
 			}
 		}
-				
+						
 		# $t2 = microtime(true);
 		# qvar_dumpk('Prepare mby: ' . (($t2 - $t1)*1000));
 		
 		# $t1 = microtime(true);
+		
+		$ids_found_by_mby = [];
+		
 		if ($merge_by_meta && $merge_by_data)
 		{
 			foreach ($merge_by_meta as $mby_key => $mby_info)
@@ -154,8 +191,24 @@ final class QSqlTable_Titem
 				$tmp_app = null;
 				$key_val_data = null;
 				
+				if ($mby_types[0])
+				{
+					# app merge by
+					$array = new \QModelArray();
+					$tmp_app = \QApp::NewData();
+					$array[] = $tmp_app;
+					$key_val_data = [];
+					$key_val_data[$tmp_app->getId()] = $mby_data_c[0];
+					foreach ($mby_app_props as $app_prop)
+						$this->process_merge_by(true, $mby_info, $array, $app_prop, $key_val_data, $merge_by_find[$mby_pos], $class_name, $ids_to_q, $ids_found_by_mby);
+				}
 				if ($mby_types[1] && $parent_property_name)
 				{
+					if ($mby_types[0])
+					{
+						throw new \Exception('We need to test this !?');
+					}
+					
 					foreach ($mby_data_c as $k => $mby_data_item)
 					{
 						if (is_numeric($k))
@@ -171,31 +224,26 @@ final class QSqlTable_Titem
 							$array_count++;
 						}
 
-						$this->process_merge_by(false, $mby_info, $array, $parent_property_name, $mby_data_item, $merge_by_find[$mby_pos], $class_name, $ids_to_q);
+						$this->process_merge_by(false, $mby_info, $array, $parent_property_name, $mby_data_item, $merge_by_find[$mby_pos], $class_name, $ids_to_q, $ids_found_by_mby);
 					}
-				}
-				# property merge-by has priority and will be resolved first
-				else if ($mby_types[0])
-				{
-					# app merge by
-					$array = new \QModelArray();
-					$tmp_app = \QApp::NewData();
-					$array[] = $tmp_app;
-					$key_val_data = [];
-					$key_val_data[$tmp_app->getId()] = $mby_data_c[0];
-					foreach ($mby_app_props as $app_prop)
-						$this->process_merge_by(true, $mby_info, $array, $app_prop, $key_val_data, $merge_by_find[$mby_pos], $class_name, $ids_to_q);
 				}
 			}
 		}
 		# $t2 = microtime(true);
 		# qvar_dumpk('RUN mby: ' . (($t2 - $t1)*1000));
 		
-		$existing_records = [];
+		if (!isset($existing_records_global[$class_name]))
+			$existing_records_global[$class_name] = [];
+		$existing_records = &$existing_records_global[$class_name];
 		$id_col_name = null;
 		
 		$sql_info_model = $this->getSqlInfo_model($sql_cache, $selector);
-		
+		# $extend_selector = $sql_info_model['extend_selector'];
+		# if ($extend_selector) { }
+		# idf object ... relation | type:id | parent(ty:id):property:mergeby
+		# load object -> do action | set backref
+		# @storage.oneToOne --> put it on the backref action
+
 		if ($ids_to_q)
 		{
 			$id_col_name = $sql_info_model["id_col"];
@@ -214,7 +262,12 @@ final class QSqlTable_Titem
 			while (($row = $res_sel->fetch_assoc()))
 				$existing_records[$row[$id_col_name]] = $row;
 		}
-						
+		
+		$merge_by_needs_insert = $merge_by_meta && reset($merge_by_meta)[10] ? true :  false;
+		$merge_by_needs_insert_meta = $merge_by_needs_insert ? reset($merge_by_meta) : null;
+		
+		$one_to_one_ops = [];
+
 		foreach ($this->items as $model_inf)
 		{
 			list ($model, $action, /*$parent_model_class */, $parent_model_object) = $model_inf;
@@ -232,10 +285,11 @@ final class QSqlTable_Titem
 				{
 					if (isset($tmp_mbykeys[2])) # by property
 						$simblings = $merge_by_find[$tmp_mbykeys[0]][$tmp_mbykeys[1]][$tmp_mbykeys[2]];
-					else if (isset($tmp_mbykeys[1])) # by property
+					else if (isset($tmp_mbykeys[1])) # by type
 						$simblings = $merge_by_find[$tmp_mbykeys[0]][$tmp_mbykeys[1]];
 					else
 						continue;
+
 					foreach ($simblings ?: [] as $simbling_model)
 					{
 						$simbling_id = $simbling_model->getId();
@@ -275,7 +329,13 @@ final class QSqlTable_Titem
 				$is_not_first = $duplicates_list ? ($first_duplicate !== $model) : null;
 				*/
 				
-				$record_rowid = $model_id ? $existing_records[$model_id] : null;
+				$record_rowid = null;
+				if ($model_id)
+				{
+					$record_rowid = $existing_records[$model_id];
+					if (!$record_rowid)
+						throw new \Exception("Missig record for item with id.");
+				}
 				
 				if ($update && ($record_rowid !== null))
 				{
@@ -331,7 +391,19 @@ final class QSqlTable_Titem
 							
 							if (($one_to_one = $meta[$p_name]['oneToOne']))
 							{
-								$one_to_one_ops[$class_name][$p_name][] = [$model, $p_name, $one_to_one];
+								# if ($old_value) ... bla 
+								# qvar_dumpk('@TODO oneToOne', $one_to_one, $record[$cols_inf["ref"]], $record[$cols_inf["type"]], $value, $model);
+								# throw new \Exception('ex:oneToOne :: update');
+								# $one_to_one_ops[][$p_name][] = [$model, $p_name, $one_to_one];
+								if ($value)
+									$value->{"set{$one_to_one[0]}"}($model);
+								else if (($old_value = $record[$cols_inf["ref"]]))
+								{
+									# @TODO --- yeah ... back-reference ?! - why not !
+									# @TODO --- back-reference in both cases !!!
+									qvar_dumpk("@TODO - unset oneToOne");
+									throw new \Exception('@TODO - unset oneToOne');
+								}
 							}
 
 							if ($p_name !== "_type")
@@ -342,7 +414,7 @@ final class QSqlTable_Titem
 							{
 								$info_to_set = [$cols_inf["ref"] => $value];
 								if ($cols_inf['type'])
-									$info_to_set[$cols_inf['type']] = $this->extractTypeIdForVariable($value);
+									$info_to_set[$cols_inf['type']] = $value->get_Type_Id();
 								
 								$this->setBackReference_New($sql_info, "UPDATE", $cols_inf["ref"], $model, $info_to_set);
 							}
@@ -365,6 +437,8 @@ final class QSqlTable_Titem
 					$upd_pairs = [];
 					# $yield_obj_binds = [];
 					
+					# @TODO - update existing records !
+					
 					foreach ($changed_props as $ch_prop)
 					{
 						if (($c = $sql_info["cols"][$ch_prop]["val"]) !== null)
@@ -383,10 +457,13 @@ final class QSqlTable_Titem
 							# $yield_obj_binds[] = $sql_info["vals"][$ch_prop]["type"];
 						}
 
+						# deprecated
+						/*
 						if ((($prop_item = $model->$ch_prop) instanceof \QIModel) && ($prop_app_property = $this->model_type->properties[$ch_prop]->getAppPropertyFor(get_class($prop_item))))
 						{
 							$app_bindings[$prop_app_property][] = $prop_item;
 						}
+						*/
 					}
 
 					// var_dump($upd_pairs);
@@ -427,22 +504,35 @@ final class QSqlTable_Titem
 							# was not set
 							continue;
 							
-						if (($one_to_one = $meta[$p_name]['oneToOne']))
+						if ($value && ($one_to_one = $meta[$p_name]['oneToOne']))
 						{
-							$one_to_one_ops[$class_name][$p_name][] = [$model, $p_name, $one_to_one];
+							# @TODO - old value must be set back to null if it's no longer the same
+							#		- new value must be linked to model if exists
+							#		- so there will be up to 2 back-ref actions to be set
+							#		- how will this affect change events ????
+							
+							# qvar_dumpk('xxxxxxxxxxxxxx', $value, $one_to_one);
+							# $value->{"set{$one_to_one[0]}"}($model);
+							# qvar_dumpk('---------', $value);
+							# die;
+							# $this->setBackReference_New($sql_info, "UPDATE", $cols_inf["ref"], $model, $info_to_set);
+							# $this->setBackReference_New($sql_in, $upd_pairs, $yield_obj_q, $identified_by, $changed_props)
 						}
 						
+						# deprecated
+						/*
 						if ((($prop_item = $model->$p_name) instanceof \QIModel) && ($prop_app_property = $model->getModelType()->properties[$p_name]->getAppPropertyFor(get_class($prop_item))))
 						{
 							$app_bindings[$prop_app_property][] = $prop_item;
 						}
+						*/
 						
 						if (($value instanceof QIModel) && (!($value instanceof QIModelArray)))
 						{
 							# $this->setBackReference($backrefs_list, $sql_info_model, $cols[$p_name]["ref"], $value, $model);
 							$info_to_set = [$cols_inf["ref"] => $value];
 							if ($cols_inf['type'])
-								$info_to_set[$cols_inf['type']] = $this->extractTypeIdForVariable($value);
+								$info_to_set[$cols_inf['type']] = $value->get_Type_Id();
 							# qvar_dumpk('setBackReference_New REF', $info_to_set);
 							$this->setBackReference_New($sql_info, "INSERT", $cols_inf["ref"], $model, $info_to_set);
 						}
@@ -456,7 +546,7 @@ final class QSqlTable_Titem
 					}
 										
 					$yield_obj_q = "INSERT INTO ".$sql_info["tab"]." (`".implode("`,`", $sql_info["cols"]["%"])."`) VALUES (".implode(",", $escaped_vals).");";
-					
+										
 					$rc = $this->query($yield_obj_q);
 					if (!$rc)
 					{
@@ -475,6 +565,7 @@ final class QSqlTable_Titem
 					
 					$model->setId($insert_id);
 
+					/* # OLD WAY - deprecated
 					if ($meta)
 					{
 						# @TODO oneToOne
@@ -494,13 +585,36 @@ final class QSqlTable_Titem
 							}
 						}
 					}
+					*/
 				}
 			
+				if ($merge_by_needs_insert && (empty($ids_found_by_mby) || (!$ids_found_by_mby[$model->getId()])))
+				{
+					# $ret[$type_mergeBy][3] = $mby_app_props; $ret[$type_mergeBy][4] = \QApp::GetDataClass(); $ret[$type_mergeBy][5] = \QApp::GetDataId();
+					$merge_by_posib_not_linked[$merge_by_needs_insert_meta[4]][$merge_by_needs_insert_meta[5]][reset($merge_by_needs_insert_meta[3])][$model->_gp[0][1]] = $model;
+					# @TODO ... 1. make sure it's not already in
+					#			2. add it in the collection
+					#			3. the collection must be processed last, bu hu hu
+					# qvar_dumpk('$merge_by_needs_insert', $ids_found_by_mby, $model);
+					# die;
+					# flag it as not inserted ?!
+				}
 			}
 			else if ($action & QModel::TransformDelete)
 			{
 				if (!$model->getId())
 					throw new \Exception('Missing Id for delete');
+				
+				# @TODO we should still do the ONE TO ONE ? - do we respect ref rules ? - I think we should !!!!
+				/*
+				if ($value && ($one_to_one = $meta[$p_name]['oneToOne']))
+				{
+					qvar_dumpk('@TODO oneToOne');
+					throw new \Exception('ex:oneToOne :: insert');
+
+					$one_to_one_ops[$class_name][$p_name][] = [$model, $p_name, $one_to_one];
+				}
+				*/
 				
 				# useless in soft-delete mode
 				
@@ -524,6 +638,8 @@ final class QSqlTable_Titem
 		}
 		
 		unset($merge_by_find);
+		
+		# return [$extend_selector ?: null, ];
 	}
 	
 	public function run_collection(array &$backrefs_list, array $table_to_properties)
@@ -586,15 +702,27 @@ final class QSqlTable_Titem
 		$reading_queries_by_rowid = [];
 		$reading_queries_by_uniqn = [];
 		$data_by_rowid = [];
+		$data_by_uniqueness = [];
+		
+		$collection_has_item_type = $sql_info['cols']['type'] ? true : false;
+		$collection_has_bkref_type = $sql_info['cols']['bkref_type'] ? true : false;
+		
+		$tmp_use_cols = [$sql_info["cols"]['ref'], $sql_info["cols"]['bkref']];
+									if ($collection_has_item_type)
+										$tmp_use_cols[] = $sql_info["cols"]['type'];
+									if ($collection_has_bkref_type)
+										$tmp_use_cols[] = $sql_info["cols"]['bkref_type'];
 		
 		# READ EXISTING DATA
 		# if (!$one_to_many)
+		
 		{
 			foreach ($this->items as $model_inf)
 			{
 				list ($model, $parent_model) = $model_inf;
 				$parent_id = (int)$parent_model->getId();
-
+				$parent_type_id = $parent_model->get_Type_Id();
+				
 				$action = ($ts !== null) ? $ts : (($model->_ts !== null) ? $model->_ts : QModel::TransformMerge);
 				$update = ($action & QModel::TransformUpdate);
 
@@ -615,7 +743,13 @@ final class QSqlTable_Titem
 							$rowid = (int)$item->getId();
 						else if ($find_by_uniqueness && ($tmp_mp_id = $parent_id) && ($tmp_it_id = (int)$item->getId()))
 						{
-							$uniqueness = [$tmp_it_id, $tmp_mp_id];
+							$uniqueness = ["{$tmp_it_id}\x00{$tmp_mp_id}".
+												($collection_has_item_type ? "\x00".$item->get_Type_Id() : '').
+												($collection_has_bkref_type ? "\x00".$parent_type_id : ''), 
+											"({$tmp_it_id},{$tmp_mp_id}".
+												($collection_has_item_type ? ",".$item->get_Type_Id() : '').
+												($collection_has_bkref_type ? ",".$parent_type_id : '').
+												')'];
 						}
 					}
 					
@@ -628,17 +762,21 @@ final class QSqlTable_Titem
 							{
 								// $sql_select = "SELECT `".implode("`,`", $sql_info["cols"])."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
 								if (!isset($reading_queries_by_rowid[0]))
+								{
 									$reading_queries_by_rowid[0] = "SELECT `".implode("`,`", $sql_info["cols"])."`,`".$sql_info["id_col"]."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."` IN ";
+								}
 								$reading_queries_by_rowid[1][$rowid] = $rowid;
 								$reading_queries_by_rowid[2] = $sql_info["id_col"];
 							}
 							else if ($uniqueness) // by uniqueness
 							{
 								if (!isset($reading_queries_by_uniqn[0]))
+								{
 									$reading_queries_by_uniqn[0] = [
-											"SELECT `".implode("`,`", $sql_info["cols"])."`,`{$sql_info["id_col"]}`,`{$sql_info["cols"]["ref"]}`,`{$sql_info["cols"]["bkref"]}` FROM {$sql_info["tab"]} WHERE ",
-											$sql_info["cols"]["ref"], $sql_info["cols"]["bkref"]];
-								$reading_queries_by_uniqn[1][$uniqueness[0]."\n".$uniqueness[1]] = [$uniqueness[0], $uniqueness[1]];
+											"SELECT `".implode("`,`", $tmp_use_cols)."`,`{$sql_info["id_col"]}` FROM {$sql_info["tab"]} WHERE (`".implode("`,`", $tmp_use_cols)."`) IN ",
+											$tmp_use_cols];
+								}
+								$reading_queries_by_uniqn[1][$uniqueness[0]] = $uniqueness[1];
 							}
 						}
 					}
@@ -649,7 +787,9 @@ final class QSqlTable_Titem
 						{
 							// $sql_select = "SELECT `".implode("`,`", $sql_info["cols"])."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
 							if (!isset($reading_queries_by_rowid[0]))
+							{
 								$reading_queries_by_rowid[0] = "SELECT `".implode("`,`", $sql_info["cols"])."`,`".$sql_info["id_col"]."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."` IN ";
+							}
 							$reading_queries_by_rowid[1][$rowid] = $rowid;
 							$reading_queries_by_rowid[2] = $sql_info["id_col"];
 						}
@@ -670,8 +810,20 @@ final class QSqlTable_Titem
 		
 		if ($reading_queries_by_uniqn && $reading_queries_by_uniqn[1])
 		{
-			qvar_dumpk('$reading_queries_by_uniqn', $reading_queries_by_uniqn);
-			throw new \Exception('@TODO');
+			$q = $reading_queries_by_uniqn[0][0]." (". implode(",", $reading_queries_by_uniqn[1]).");";
+			
+			$res = $this->query($q);
+			if (!$res)
+			{
+				if (\QAutoload::GetDevelopmentMode())
+					qvar_dumpk($q);
+				throw new \Exception($connection->error);
+			}
+			while (($row = $res->fetch_row()))
+			{
+				$record_id = array_pop($row);
+				$data_by_uniqueness[implode("\x00", $row)] = $record_id;
+			}
 		}
 		
 		$update_to_delete_queries = [];
@@ -728,7 +880,15 @@ final class QSqlTable_Titem
 						}
 						else if ($find_by_uniqueness && $item_is_model && ($tmp_mp_id = $parent_id) && ($tmp_it_id = (int)$item->getId()))
 						{
-							$uniqueness = [$tmp_it_id, $tmp_mp_id];
+							$uniqueness = ["{$tmp_it_id}\x00{$tmp_mp_id}".
+												($collection_has_item_type ? "\x00".$item->get_Type_Id() : '').
+												($collection_has_bkref_type ? "\x00".$parent_type_id : ''), 
+											"({$tmp_it_id},{$tmp_mp_id}".
+												($collection_has_item_type ? ",".$item->get_Type_Id() : '').
+												($collection_has_bkref_type ? ",".$parent_type_id : '').
+												')'];
+							qvar_dumpk($uniqueness, $data_by_uniqueness);
+							
 							throw new \Exception('pick by uniqueness');
 						}
 					}
@@ -879,7 +1039,7 @@ final class QSqlTable_Titem
 								if ($sql_info['cols']['bkref_type'])
 								{
 									$ins_cols[] = $sql_info['cols']['bkref_type'];
-									$ins_vals[] = $this->extractTypeIdForVariable($parent_model);
+									$ins_vals[] = $parent_model->get_Type_Id();
 								}
 
 								$yield_obj_q = "INSERT INTO ".$sql_info["tab"]." (`".implode("`,`", $ins_cols)."`) VALUES (".implode(",", $ins_vals).");";
@@ -926,7 +1086,7 @@ final class QSqlTable_Titem
 									if ($sql_info["cols"]["type"])
 										$bk_cols_to_set[] = $this->extractTypeIdForVariable($item);
 									if ($sql_info["cols"]["bkref_type"])
-										$bk_cols_to_set[] = $this->extractTypeIdForVariable($parent_model);
+										$bk_cols_to_set[] = $parent_model->get_Type_Id();
 
 									# $sql_info["cols"]["type"]
 									$identifier_group_cols = implode("_\x00_", ($sql_info["cols"]["type"]) ? 
@@ -996,7 +1156,7 @@ final class QSqlTable_Titem
 								$coll_item_has_changes = true;
 								if ($rowid && ($in_db = $data_by_rowid[$rowid]) && ($backref_val = $in_db[$sql_info["cols"]["bkref"]]) && 
 										((int)$backref_val == (int)$parent_id) && ((!($backref_type = $sql_info["cols"]["bkref_type"])) || 
-											($this->extractTypeIdForVariable($parent_model) == $in_db[$sql_info["cols"]["bkref_type"]])))
+											($parent_model->get_Type_Id() == $in_db[$sql_info["cols"]["bkref_type"]])))
 								{
 									# @TODO , should we check the type ? can it make a difference ?!
 									$coll_item_has_changes = false;
@@ -1009,7 +1169,7 @@ final class QSqlTable_Titem
 									#		$sql_info, $sql_info["cols"]["bkref"], $parent_model, $backref_val, $model, $key);
 									
 									$this->setBackReference_New($sql_info, "ONE2M_UPDATE", $sql_info["cols"]["bkref"],
-											$item, [0 => $parent_id, 1 => $this->extractTypeIdForVariable($parent_model)], $model, $key);
+											$item, [0 => $parent_id, 1 => $parent_model->get_Type_Id()], $model, $key);
 								}
 							}
 							else
@@ -1138,7 +1298,7 @@ final class QSqlTable_Titem
 		{
 			$parent_model = $replacements->getInfo();
 			$parent_id = (int)$parent_model->getId();
-			$parent_type = $cols_backref_type ? $this->extractTypeIdForVariable($parent_model) : null;
+			$parent_type = $cols_backref_type ? $parent_model->get_Type_Id() : null;
 			$delete_for_replacements[$parent_id] = [];
 			
 			foreach ($model as $key => $item)
@@ -1210,6 +1370,8 @@ final class QSqlTable_Titem
 		// $table_types =  QSqlModelInfoType::GetTableTypes($m_type->getTableName());
 		if ($cols_type_inf_tab && ($ci = $cols_type_inf_tab[$rowid_col]) && is_string($ci))
 			$cols["%"][] = $cols["_type"]["val"] = $ci;
+		
+		$extend_selector = [];
 
 		foreach ($props as $prop)
 		{
@@ -1217,9 +1379,6 @@ final class QSqlTable_Titem
 				continue;
 
 			$p_name = $prop->name;
-
-			if (($one_to_one = trim($prop->storage['oneToOne'])))
-				$meta[$p_name]['oneToOne'] = [$one_to_one, $prop->getAllInstantiableReferenceTypes()];
 
 			if (	// if we have a selector and this property is not included
 					(($selector === false) || ($selector_isarr && ($selector[$prop->name] === null) && ($selector["*"] === null))) )
@@ -1230,6 +1389,14 @@ final class QSqlTable_Titem
 			{
 				// check id
 				continue;
+			}
+
+			if (($one_to_one = trim($prop->storage['oneToOne'])))
+			{
+				$meta[$p_name]['oneToOne'] = [$one_to_one, $prop->getAllInstantiableReferenceTypes()];
+				# @TODO - put some logging that we have extended the selector !
+				# if (!isset($selector[$prop->name][$one_to_one]))
+				#	$extend_selector[$prop->name][$one_to_one] = [];
 			}
 
 			if (!($cols[$p_name] = $cached_prop = $cache[$cache_key][$p_name]))
@@ -1277,8 +1444,9 @@ final class QSqlTable_Titem
 			if (!$cached_prop)
 				throw new \Exception('Should not be.');
 		}
-
-		return ["sql" => null, "cols" => $cols, "vals" => null, "tab" => qEscTable($this->table_name), "id_col" => $rowid_col, "objs" => null, 'meta' =>  $meta];
+		
+		return ["sql" => null, "cols" => $cols, "vals" => null, "tab" => qEscTable($this->table_name), "id_col" => $rowid_col, 
+						"objs" => null, 'meta' =>  $meta, 'extend_selector' => $extend_selector];
 	}
 	
 	protected function getSqlInfo_collection(array &$cache, bool $one_to_many, QModelProperty $property)
@@ -1363,7 +1531,7 @@ final class QSqlTable_Titem
 		if (($ci = $cols["_type"]["val"]) && is_string($ci))
 		{
 			$cols["%"][] = $cols["_type"]["val"] = $ci;
-			$vals["%"][] = $vals["_type"]["val"] = $this->extractTypeIdForVariable($model);
+			$vals["%"][] = $vals["_type"]["val"] = $model->get_Type_Id();
 		}
 
 		foreach ($props as $p_name => $prop)
@@ -1398,7 +1566,7 @@ final class QSqlTable_Titem
 				{
 					if ($cached_prop["type"])
 					{
-						$vals["%"][] = $vals[$p_name]["type"] = $this->extractTypeIdForVariable($value);
+						$vals["%"][] = $vals[$p_name]["type"] = $value->get_Type_Id();
 						$cols["%"][] = $cached_prop["type"];
 					}
 					if ($cached_prop["ref"])
@@ -1500,37 +1668,6 @@ final class QSqlTable_Titem
 	
 	private function get_mergeby_meta(string $class_name, string $parent_property_name, string $parent_class_name_or_zero, \QModelProperty $property = null)
 	{
-		$type_mergeBy = null;
-		{
-			if (($mby_inf = static::$_MergeByInfo[$class_name]) !== null)
-				$type_mergeBy = $mby_inf;
-			else if (($type_inf = \QModel::GetTypesCache($class_name)) && ($type_mergeBy = $type_inf["#%misc"]["mergeBy"]))
-				static::$_MergeByInfo[$class_name] = $type_mergeBy;
-			else
-				static::$_MergeByInfo[$class_name] = false;
-		}
-		
-		if ($type_mergeBy)
-		{
-			$parts = preg_split("/(\\s*\\,\\s*)/uis", $type_mergeBy, -1, PREG_SPLIT_NO_EMPTY);
-			
-			$merge_by_meta_type_parsed = [];
-			foreach ($parts as $part)
-				$merge_by_meta_type_parsed[] = preg_split("/(\\s*\\.\\s*)/uis", $part, -1, PREG_SPLIT_NO_EMPTY);
-			
-			# to cleanup spaces
-			$type_mergeBy = preg_replace("/(\\s+)/uis", "", $type_mergeBy);
-			
-			// global merge by
-			if ($property && ($app_property = $property->getAppPropertyFor($class_name)))
-				$mby_app_props = [$app_property => $app_property];
-			else
-				$mby_app_props = \QModel::GetDefaultAppPropertiesForTypeValues($class_name);
-
-			if (!$mby_app_props)
-				throw new \Exception("We have a mergeBy on {$class_name} but we can not find it's app property");
-		}
-		
 		$property_mergeBy = null;
 		if ($parent_class_name_or_zero && $parent_property_name)
 		{
@@ -1541,6 +1678,64 @@ final class QSqlTable_Titem
 				static::$_MergeByInfo[$key] = $property_mergeBy;
 			else
 				static::$_MergeByInfo[$key] = false;
+		}
+		
+		$type_mergeBy = null;
+		$type_mergeBy_needs_insert = false; # do we need to make sure the item will be inserted in the collection
+		if (!$property_mergeBy)
+		{
+			{
+				if (($mby_inf = static::$_MergeByInfo[$class_name]) !== null)
+					$type_mergeBy = $mby_inf;
+				else if (($type_inf = \QModel::GetTypesCache($class_name)) && ($type_mergeBy = $type_inf["#%misc"]["mergeBy"]))
+					static::$_MergeByInfo[$class_name] = $type_mergeBy;
+				else
+					static::$_MergeByInfo[$class_name] = false;
+			}
+
+			if ($type_mergeBy)
+			{
+				$app_data_class_name = \QApp::GetDataClass();
+				# we are under app -> use it
+				# if not under app - storage - use optionsPool or error !
+				$options_pool_prop = $property->storage["optionsPool"] ?: 
+									(($parent_class_name_or_zero === $app_data_class_name) ? $property->name : false);
+				if ($options_pool_prop)
+				{
+					$op_property = $options_pool_prop ? \QModel::GetTypeByName($app_data_class_name)->properties[$options_pool_prop] : false;
+					if (!$op_property)
+						throw new \Exception('Options pool not found: '.$options_pool_prop);
+
+					$mby_app_props = [$options_pool_prop => $options_pool_prop];
+					/*if ($property && ($app_property = $property->getAppPropertyFor($class_name)))
+						$mby_app_props = [$app_property => $app_property];
+					else
+						$mby_app_props = \QModel::GetDefaultAppPropertiesForTypeValues($class_name);*/
+					if (($parent_class_name_or_zero !== $app_data_class_name) || ($parent_property_name !== $options_pool_prop))
+					{
+						$type_mergeBy_needs_insert = true;
+						# qvar_dumpk($parent_class_name_or_zero, $parent_property_name, $property, $class_name, $mby_app_props);
+						# die("dasdad");
+					}
+
+					if (!$mby_app_props)
+						throw new \Exception("We have a mergeBy on {$class_name} but we can not find it's app property");
+						
+					$parts = preg_split("/(\\s*\\,\\s*)/uis", $type_mergeBy, -1, PREG_SPLIT_NO_EMPTY);
+
+					$merge_by_meta_type_parsed = [];
+					foreach ($parts as $part)
+						$merge_by_meta_type_parsed[] = preg_split("/(\\s*\\.\\s*)/uis", $part, -1, PREG_SPLIT_NO_EMPTY);
+
+					# to cleanup spaces
+					$type_mergeBy = preg_replace("/(\\s+)/uis", "", $type_mergeBy);
+				}
+				else
+				{
+					# we don't have optionsPool nor we are on app level, so we will ignore merge-by
+					$type_mergeBy = null;
+				}
+			}
 		}
 		
 		if ($property_mergeBy)
@@ -1592,6 +1787,7 @@ final class QSqlTable_Titem
 				$ret[$property_mergeBy][7] = explode(",", $property_mergeBy);
 				$ret[$property_mergeBy][8] = $property_is_collection ? $collection_back_ref_column : $reference_column;
 				$ret[$property_mergeBy][9] = $property_is_collection;
+				$ret[$property_mergeBy][10] = false;
 			}
 			if ($type_mergeBy)
 			{
@@ -1610,19 +1806,15 @@ final class QSqlTable_Titem
 				$ret[$type_mergeBy][7] = explode(",", $type_mergeBy);
 				$ret[$type_mergeBy][8] = $property_is_collection ? $collection_back_ref_column : $reference_column;
 				$ret[$type_mergeBy][9] = $property_is_collection;
-				
-				# if ($property_mergeBy)
-				{
-					# qvar_dumpk($ret);
-					# throw new \Exception('@todo test merge by for both property and type');
-				}
+				$ret[$type_mergeBy][10] = $type_mergeBy_needs_insert;
 			}
 			
 			return $ret;
 		}
 	}
 	
-	private function get_mergeby_data(array $merge_by_meta, array &$merge_by_data, array &$merge_by_find, array &$merge_by_pool, \QIModel $model, 
+	private function get_mergeby_data(array $merge_by_meta, array &$merge_by_data, array &$merge_by_find, array &$merge_by_pool, array &$merge_by_linked, 
+								bool $is_collection_on_top_level, \QIModel $model, 
 								string $parent_class_name_or_zero, \QIModel $parent_model_object, string $parent_property)
 	{
 		# qvar_dumpk('$merge_by_meta_type, $merge_by_meta_prop', $merge_by_meta_type, $merge_by_meta_prop);
@@ -1676,15 +1868,6 @@ final class QSqlTable_Titem
 					$model->_gp[] = [$pos, (int)$parent_model_object->getId(), $key];
 					
 					$merge_by_data[$pos][$parent_class_name_or_zero][$p_id][$key] = $data;
-					/*if (!$ref)
-						$ref = new \SplObjectStorage();
-					if (!isset($ref[$parent_model_object]))
-						$ref[$parent_model_object] = [$key => $data];
-					else
-						$ref[$parent_model_object][$key] = $data;
-					unset($ref);*/
-					# $merge_by_find[$pos][$p_id][$key][] = $model;
-					# qvar_dumpk('$merge_by_find (A)', $merge_by_find, $model,$merge_by_pool);
 				}
 				# property has priority
 				else if ($type_and_or_prop[0])
@@ -1697,8 +1880,6 @@ final class QSqlTable_Titem
 					$model->_gp[] = [$pos, $key];
 					# $merge_by_data[$pos][0] = list of all key => data
 					$merge_by_data[$pos][0][$key] = $data;
-
-					# qvar_dumpk('$merge_by_find (B)', $merge_by_find, $model);
 				}
 				
 			}
@@ -1767,7 +1948,7 @@ final class QSqlTable_Titem
 	}
 	
 	private function process_merge_by(bool $on_app_search, array $mby_info, \QModelArray $array, string $app_prop, 
-											array $key_val_data, array $merge_by_find, string $class_name, array &$ids_to_q)
+											array $key_val_data, array $merge_by_find, string $class_name, array &$ids_to_q, array &$ids_found_by_mby)
 	{
 		# @TODO test merge by in more complex situations
 		# @TODO ... if query too long, split it in chunks
@@ -1910,6 +2091,10 @@ final class QSqlTable_Titem
 		
 		# $t1 = microtime(true);
 		$array->query($query_str);
+		$merge_by_needs_insert = $mby_info[10] ? true :  false;
+			
+		# some will be in the collection, some will not ve
+		# $merge_by_needs_insert = $merge_by_meta ? reset($merge_by_meta)[10] : false;
 		
 		# $zid = $this->__id ?: ($this->__id = ++static::$__Tmp_Model_Id);
 		# qvar_dumpk("\$query_str :: {$zid} | ".$this->path." - ".$this->class_name . "\n\t\t\t\t  " . $query_str, $array);
@@ -1956,19 +2141,23 @@ final class QSqlTable_Titem
 								$obj->setId($item_id);
 								# qvar_dumpk("found: ", $obj, $item_id);
 								$ids_to_q[$item_id] = $item_id;
+								
+								if ($merge_by_needs_insert)
+									$ids_found_by_mby[$item_id] = $item_id;
 							}
 						}
 					}
 				}
 			}
 		}
-		# echo "<hr/>";
 	}
 	
 	public function resolveBackrefs_NEW()
 	{
 		if (!$this->backrefs_list)
 			return;
+	
+		\QApp::GetStorage()->connection->_stats->queries[] = "#### ------------------------ BACKREFS :: ".$this->path." -----------------------";
 		
 		foreach ($this->backrefs_list as $table_escaped => $list_of_tables)
 		{
@@ -2072,6 +2261,8 @@ final class QSqlTable_Titem
 					foreach ($list_of_sql_ops as $ops_info)
 					{
 						list ($sql_info, /* */, $identified_by, $cols_as_key_val, $set_rowid_array, $set_rowid_at_pos) = $ops_info;
+						
+						\QApp::GetStorage()->connection->_stats->queries[] = "#### ------------------------ \$sql_operation :: ".$sql_operation." -----------------------";
 
 						if ($sql_operation === "M2M_INSERT")
 						{
@@ -2091,7 +2282,7 @@ final class QSqlTable_Titem
 								# we switch to an update
 								$set_cols = "`{$query_in_ref}`='{$cols_as_key_val[0]}',`{$query_in_bkref}`='{$cols_as_key_val[1]}'".
 													($query_in_type ? ",`$query_in_type`='{$cols_as_key_val[2]}'" : "").
-													($query_in_bkref_type ? ",`$query_in_bkref_type`='{$cols_as_key_val[3]}'" : "");
+													($query_in_bkref_type ? ",`$query_in_bkref_type`='".($cols_as_key_val[$query_in_type ? 3 : 2])."'" : "");
 								#foreach ($cols_as_key_val as $k => $v)
 								#	$set_cols[] = "`{$k}`='{$v}'";
 								
@@ -2168,6 +2359,8 @@ final class QSqlTable_Titem
 				}
 			}
 		}
+		
+		\QApp::GetStorage()->connection->_stats->queries[] = "#### ------------------------ END BACKREFS :: ".$this->path." -----------------------";
 	}
 }
 
