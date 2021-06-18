@@ -43,9 +43,6 @@ final class QSqlTable_Titem
 	
 	public function run_model(array &$backrefs_list, string $parent_class_name_or_zero, array &$existing_records_global, array &$merge_by_pool, array &$merge_by_linked, array &$merge_by_posib_not_linked)
 	{
-		# qvar_dumpk('$parent_class_name_or_zero', $parent_class_name_or_zero);
-		# qvar_dumpk($this->path." : count(".count($this->items).")");
-		
 		$ts = $this->ts;
 		$class_name = $this->class_name;
 		$this->model_type = \QModel::GetTypeByName($class_name);
@@ -53,7 +50,7 @@ final class QSqlTable_Titem
 		$is_top_lvl_class = ($class_name === $app_class_name);
 		
 		# we know it's class, parent class, and property ... determine all mergeBy info
-		
+
 		$sql_cache = [];
 		$connection = $this->connection;
 		$selector = $this->selector;
@@ -113,7 +110,7 @@ final class QSqlTable_Titem
 			# if ($merge_by_meta === false)
 			#	continue;
 		}
-		
+				
 		$selector_for_mergeby_was_checked = false;
 		# $t1 = microtime(true);
 		foreach ($this->items as $model_inf)
@@ -238,7 +235,7 @@ final class QSqlTable_Titem
 		$id_col_name = null;
 		
 		$sql_info_model = $this->getSqlInfo_model($sql_cache, $selector);
-		# $extend_selector = $sql_info_model['extend_selector'];
+		$extend_selector = $sql_info_model['extend_selector'];
 		# if ($extend_selector) { }
 		# idf object ... relation | type:id | parent(ty:id):property:mergeby
 		# load object -> do action | set backref
@@ -512,7 +509,7 @@ final class QSqlTable_Titem
 							#		- how will this affect change events ????
 							
 							# qvar_dumpk('xxxxxxxxxxxxxx', $value, $one_to_one);
-							# $value->{"set{$one_to_one[0]}"}($model);
+							$value->{"set{$one_to_one[0]}"}($model);
 							# qvar_dumpk('---------', $value);
 							# die;
 							# $this->setBackReference_New($sql_info, "UPDATE", $cols_inf["ref"], $model, $info_to_set);
@@ -639,7 +636,7 @@ final class QSqlTable_Titem
 		
 		unset($merge_by_find);
 		
-		# return [$extend_selector ?: null, ];
+		return [$extend_selector ?: null, ];
 	}
 	
 	public function run_collection(array &$backrefs_list, array $table_to_properties)
@@ -839,12 +836,12 @@ final class QSqlTable_Titem
 			$action = ($ts !== null) ? $ts : (($model->_ts !== null) ? $model->_ts : QModel::TransformMerge);
 			$update = ($action & QModel::TransformUpdate);
 			$create = ($action & QModel::TransformCreate);
-			$modify_action = $update || $create;
+			# $modify_action = $update || $create;
 			
 			#if ($this->path === 'Services[].Categories')
 			#	$connection->_stats->queries[] = "# Starting parent: ".$parent_id;
 			
-			if ($modify_action)
+			# if ($modify_action) # in case of any action
 			{
 				// this means all existing items NOT IN the $model will be removed from the collection
 				$replace_elements = ($model->_ts & QModel::TransformDelete) && (($model->_ts & QModel::TransformCreate) || ($model->_ts & QModel::TransformUpdate))
@@ -1115,7 +1112,7 @@ final class QSqlTable_Titem
 							
 							$was_removed = true;
 						}
-						# else @TODO - delete by uniqeness ?
+						# else @TODO - delete by uniquness ?
 					}
 					else
 					{
@@ -1196,99 +1193,12 @@ final class QSqlTable_Titem
 							}
 						}
 					}
-
 				}
 			}
-			else
+			/* else
 			{
-				# $find_by_uniqueness = false; // @todo - check find by uniqunes (!$one_to_many) && $property->getCollectionType()->hasAnyInstantiableReferenceTypes();
-				
-				foreach ($model as $item_k => $item)
-				{
-					$item_is_model = ($item instanceof QIModel);
-					$item_action = $item_is_model ? (($item->_ts !== null) ? $item->_ts : ($model->getTransformState($item_k) ?: QModel::TransformMerge)) : $model->getTransformState($item_k);
-					
-					$item_do_delete = $item_action & QModel::TransformDelete;
-					
-					if ($item_do_delete)
-					{
-						$uniqueness = null;
-						$rowid = $model->getRowIdAtIndex($item_k);
-						
-						if ($rowid === null)
-						{
-							if ($one_to_many && $item_is_model)
-								$rowid = $item->getId();
-							else if ($find_by_uniqueness && $item_is_model && ($tmp_mp_id = $parent_model->getId()) && ($tmp_it_id = $item->getId()))
-								$uniqueness = [$tmp_it_id, $tmp_mp_id];
-						}
-						
-						if ($one_to_many)
-						{
-							if ($rowid)
-							{
-								// `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
-								/*$q_str = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
-											"WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection).
-												" AND `{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($parent_model->getId(), $connection);*/
-												
-								$yield_obj_q = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
-												($sql_info["cols"]["bkref_type"] ? ",`{$sql_info["cols"]["bkref_type"]}`=NULL " : "").
-											"WHERE `".$sql_info["id_col"]."`='{$rowid}'".
-												" AND `{$sql_info["cols"]["bkref"]}`='".$parent_model->getId()."'";
-								# $yield_obj_binds = [$rowid, $parent_model->getId()];
-							}
-							else
-							{
-								/*$q_str = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
-											" WHERE `{$sql_info["cols"]["ref"]}`=".$this->escapeScalar($uniqueness[0], $connection)." AND ".
-													"`{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($uniqueness[1], $connection);*/
-								
-								$yield_obj_q = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
-												($sql_info["cols"]["bkref_type"] ? ",`{$sql_info["cols"]["bkref_type"]}`=NULL " : "").
-											" WHERE `{$sql_info["cols"]["ref"]}`='{$uniqueness[0]}' AND ".
-													"`{$sql_info["cols"]["bkref"]}`='{$uniqueness[1]}'";
-								# $yield_obj_binds = [$uniqueness[0], $uniqueness[1]];
-							}
-						}
-						else
-						{
-
-							if ($rowid)
-							{
-								// `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
-								/* $q_str = "DELETE FROM ".$sql_info["tab"].
-											" WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection).
-												" AND `{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($parent_model->getId(), $connection); */
-								$yield_obj_q = "DELETE FROM ".$sql_info["tab"].
-											" WHERE `".$sql_info["id_col"]."`='{$rowid}'".
-												" AND `{$sql_info["cols"]["bkref"]}`='".$parent_model->getId()."'";
-								# $yield_obj_binds = [$rowid, $parent_model->getId()];
-							}
-							else
-							{
-								/*$q_str = "DELETE FROM ".$sql_info["tab"].
-											" WHERE `{$sql_info["cols"]["ref"]}`=".$this->escapeScalar($uniqueness[0], $connection)." AND ".
-													"`{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($uniqueness[1], $connection);*/
-													
-								$yield_obj_q = "DELETE FROM ".$sql_info["tab"].
-											" WHERE `{$sql_info["cols"]["ref"]}`='{$uniqueness[0]}' AND ".
-													"`{$sql_info["cols"]["bkref"]}`='{$uniqueness[1]}'";
-								# $yield_obj_binds = [$uniqueness[0], $uniqueness[1]];
-							}
-						}
-						
-						$rc = $this->query($yield_obj_q);
-						if (!$rc)
-							throw new \Exception($this->connection->error);
-						
-						$model->_tsx[$item_k] = QModel::TransformDelete;
-					}
-				}
-				
-				# @TODO delete
-				# throw new \Exception('@TODO - collection delete');
-			}
+				# $this->deprecated_collection_delete();
+			}*/
 		}
 		
 		# $sql_info_col_type
@@ -1379,7 +1289,7 @@ final class QSqlTable_Titem
 				continue;
 
 			$p_name = $prop->name;
-
+			
 			if (	// if we have a selector and this property is not included
 					(($selector === false) || ($selector_isarr && ($selector[$prop->name] === null) && ($selector["*"] === null))) )
 			{
@@ -1395,8 +1305,8 @@ final class QSqlTable_Titem
 			{
 				$meta[$p_name]['oneToOne'] = [$one_to_one, $prop->getAllInstantiableReferenceTypes()];
 				# @TODO - put some logging that we have extended the selector !
-				# if (!isset($selector[$prop->name][$one_to_one]))
-				#	$extend_selector[$prop->name][$one_to_one] = [];
+				if (!isset($selector[$prop->name][$one_to_one]))
+					$extend_selector[$prop->name][$one_to_one] = [];
 			}
 
 			if (!($cols[$p_name] = $cached_prop = $cache[$cache_key][$p_name]))
@@ -2361,6 +2271,96 @@ final class QSqlTable_Titem
 		}
 		
 		\QApp::GetStorage()->connection->_stats->queries[] = "#### ------------------------ END BACKREFS :: ".$this->path." -----------------------";
+	}
+	
+	function deprecated_collection_delete()
+	{
+		# $find_by_uniqueness = false; // @todo - check find by uniqunes (!$one_to_many) && $property->getCollectionType()->hasAnyInstantiableReferenceTypes();
+
+		foreach ($model as $item_k => $item)
+		{
+			$item_is_model = ($item instanceof QIModel);
+			$item_action = $item_is_model ? (($item->_ts !== null) ? $item->_ts : ($model->getTransformState($item_k) ?: QModel::TransformMerge)) : $model->getTransformState($item_k);
+
+			$item_do_delete = $item_action & QModel::TransformDelete;
+
+			if ($item_do_delete)
+			{
+				$uniqueness = null;
+				$rowid = $model->getRowIdAtIndex($item_k);
+
+				if ($rowid === null)
+				{
+					if ($one_to_many && $item_is_model)
+						$rowid = $item->getId();
+					else if ($find_by_uniqueness && $item_is_model && ($tmp_mp_id = $parent_model->getId()) && ($tmp_it_id = $item->getId()))
+						$uniqueness = [$tmp_it_id, $tmp_mp_id];
+				}
+
+				if ($one_to_many)
+				{
+					if ($rowid)
+					{
+						// `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
+						/*$q_str = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
+									"WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection).
+										" AND `{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($parent_model->getId(), $connection);*/
+
+						$yield_obj_q = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
+										($sql_info["cols"]["bkref_type"] ? ",`{$sql_info["cols"]["bkref_type"]}`=NULL " : "").
+									"WHERE `".$sql_info["id_col"]."`='{$rowid}'".
+										" AND `{$sql_info["cols"]["bkref"]}`='".$parent_model->getId()."'";
+						# $yield_obj_binds = [$rowid, $parent_model->getId()];
+					}
+					else
+					{
+						/*$q_str = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
+									" WHERE `{$sql_info["cols"]["ref"]}`=".$this->escapeScalar($uniqueness[0], $connection)." AND ".
+											"`{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($uniqueness[1], $connection);*/
+
+						$yield_obj_q = "UPDATE ".$sql_info["tab"]." SET `{$sql_info["cols"]["bkref"]}`=NULL ".
+										($sql_info["cols"]["bkref_type"] ? ",`{$sql_info["cols"]["bkref_type"]}`=NULL " : "").
+									" WHERE `{$sql_info["cols"]["ref"]}`='{$uniqueness[0]}' AND ".
+											"`{$sql_info["cols"]["bkref"]}`='{$uniqueness[1]}'";
+						# $yield_obj_binds = [$uniqueness[0], $uniqueness[1]];
+					}
+				}
+				else
+				{
+
+					if ($rowid)
+					{
+						// `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
+						/* $q_str = "DELETE FROM ".$sql_info["tab"].
+									" WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection).
+										" AND `{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($parent_model->getId(), $connection); */
+						$yield_obj_q = "DELETE FROM ".$sql_info["tab"].
+									" WHERE `".$sql_info["id_col"]."`='{$rowid}'".
+										" AND `{$sql_info["cols"]["bkref"]}`='".$parent_model->getId()."'";
+						# $yield_obj_binds = [$rowid, $parent_model->getId()];
+					}
+					else
+					{
+						/*$q_str = "DELETE FROM ".$sql_info["tab"].
+									" WHERE `{$sql_info["cols"]["ref"]}`=".$this->escapeScalar($uniqueness[0], $connection)." AND ".
+											"`{$sql_info["cols"]["bkref"]}`=".$this->escapeScalar($uniqueness[1], $connection);*/
+
+						$yield_obj_q = "DELETE FROM ".$sql_info["tab"].
+									" WHERE `{$sql_info["cols"]["ref"]}`='{$uniqueness[0]}' AND ".
+											"`{$sql_info["cols"]["bkref"]}`='{$uniqueness[1]}'";
+						# $yield_obj_binds = [$uniqueness[0], $uniqueness[1]];
+					}
+				}
+
+				$rc = $this->query($yield_obj_q);
+				if (!$rc)
+					throw new \Exception($this->connection->error);
+
+				$model->_tsx[$item_k] = QModel::TransformDelete;
+			}
+		}
+		# @TODO delete
+		# throw new \Exception('@TODO - collection delete');
 	}
 }
 

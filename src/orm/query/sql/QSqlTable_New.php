@@ -61,9 +61,9 @@ trait QSqlTable_New
 		$t1 = microtime(true);
 		
 		$max_row = static::$Max_Allowed_Packet ?: (static::$Max_Allowed_Packet = $connection->query("SHOW VARIABLES LIKE 'max_allowed_packet';")->fetch_assoc());
-		$max_query_len = $max_row["Value"] ?: next($max_row) ?: $max_query_len;
+		$max_query_len = (int)$max_row["Value"];
 		
-		$all_objects = new SplObjectStorage();
+		# $all_objects = new SplObjectStorage();
 		$process_objects = new SplObjectStorage();
 		foreach ($model_list as $obj)
 		{
@@ -110,7 +110,7 @@ trait QSqlTable_New
 		$merge_by_posib_not_linked = [];
 		$existing_records_global = [];
 		
-		$arr = \QSqlModelInfoType::GetTablePropertyList();
+		$arr = [];# \QSqlModelInfoType::GetTablePropertyList();
 		$table_to_properties = [];
 		foreach ($arr as $k => $v)
 			$table_to_properties[$v][$k] = $k;
@@ -172,45 +172,22 @@ trait QSqlTable_New
 			}
 		}
 		
-		$t2 = microtime(true);
-		$m2 = memory_get_usage();
-		
-		# qvar_dumpk('$merge_by_pool', $merge_by_pool, '$merge_by_linked', $merge_by_linked, '$merge_by_posib_not_linked', $merge_by_posib_not_linked);
-		unset($merge_by_pool);
-		# $this->resolveBackrefs_NEW($backrefs_list);
+		# $t2 = microtime(true);
+		# $m2 = memory_get_usage();
 		
 		foreach ($locked_objects as $lo)
 			unset($lo->_lk);
 		
-		# $connection->query("COMMIT;");
-		
-		/* qvar_dumpk("mem: " . round(($m2 - $m1) / 1024),
-					"time: " . round(($t2 - $t1), 5), $ticks, 
-				$connection->_stats);
-		*/
-		# not a cheap traverse ... maybe we should also prepare the OPs
-		# and Q the OPs on a para thread to gain some speed !!!
-		#			!!!! this is very smart !!!!
-
-		/*
-		foreach ($loop_lists as $k => $data)
-		{
-			foreach ($data as $ty => $spl_obj)
-				qvar_dumpk("{$k}/{$ty}", $spl_obj);
-		}
-		 * 
-		 */
-		
-		# die("aaa");
+		# $connection, array $model_list, $ts = null, $selector
+		unset($process_objects, $loop_lists, $backrefs_list, $locked_objects, $merge_by_pool, $merge_by_linked, 
+					$merge_by_posib_not_linked, $existing_records_global, $arr, $table_to_properties);
 	}
 	
 	protected static function recurseObjects_New(array &$backrefs_list, $connection, $storage, $ts, array &$loop_lists, 
 					SplObjectStorage $process_objects, $selector = null, string $path = '', int &$ticks = 0, 
-					array &$locked_objects = null, array &$existing_records_global, array &$merge_by_pool = null,
+					array &$locked_objects = null, array &$existing_records_global = null, array &$merge_by_pool = null,
 					array &$merge_by_linked = null, array &$merge_by_posib_not_linked = null, array $table_to_properties = null)
 	{
-		# qvar_dumpk("PATH :: ".$path);
-		
 		$new_loop_list = []; # by path / type
 		$new_loop_list_coll = [];
 		$next_recurse_list = [];
@@ -219,8 +196,6 @@ trait QSqlTable_New
 			$selector = [];
 		
 		$cached_type_props = [];
-		
-		# qvar_dumpk('$selector :: '.qImplodeEntity($selector));
 		
 		foreach ($process_objects as $model_object)
 		{
@@ -303,7 +278,7 @@ trait QSqlTable_New
 		
 		$transaction_elems = [];
 		
-		# $extend_selector = null;
+		$extend_selector = null;
 		
 		if ($new_loop_list)
 		{
@@ -317,10 +292,10 @@ trait QSqlTable_New
 						# qvar_dumpk("# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ");
 						$connection->_stats->queries[] = "# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ";
 						$transaction_item = new QSqlTable_Titem($path, $exec_items, $connection, $storage, $selector, $ts, $class_name, false);
-						/*list($extend_selector_tmp, ) = */
-						$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked);
-						# if ($extend_selector_tmp)
-						# 	$extend_selector = $extend_selector ? qJoinSelectors($extend_selector, $extend_selector_tmp) : $extend_selector_tmp;
+						list($extend_selector_tmp, ) = 
+									$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked);
+						if ($extend_selector_tmp)
+						 	$extend_selector = $extend_selector ? qJoinSelectors($extend_selector, $extend_selector_tmp) : $extend_selector_tmp;
 
 						if ($transaction_item->backrefs_list)
 							$transaction_elems[] = $transaction_item;
@@ -329,9 +304,11 @@ trait QSqlTable_New
 			}
 		}
 		
-		# if ($extend_selector)
+		if ($extend_selector)
+		{
 			# atm needed for oneToOne
-		#	$selector = qJoinSelectors($selector, $extend_selector);
+			$selector = qJoinSelectors($selector, $extend_selector);
+		}
 	
 		foreach ($next_recurse_list as $k => $list)
 		{
