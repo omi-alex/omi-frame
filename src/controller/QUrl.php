@@ -83,6 +83,11 @@ class QUrl
 			$this->extension = substr($last, $ep + 1);
 	}
 	
+	public static function Get_Current_Parts()
+	{
+		return static::$Requested ? static::$Requested->parts : null;
+	}
+	
 	/**
 	 * Gets the current url part
 	 * 

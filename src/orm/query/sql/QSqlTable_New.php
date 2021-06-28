@@ -102,7 +102,7 @@ trait QSqlTable_New
 		# qvar_dumpk('$selector', $selector);
 		
 		$loop_lists = [];
-		$backrefs_list = [];
+		# $backrefs_list = [];
 		
 		$locked_objects = [];
 		$merge_by_pool = [];
@@ -118,7 +118,7 @@ trait QSqlTable_New
 		$ticks = 0;
 		$m1 = memory_get_usage();
 		$t1 = microtime(true);
-		static::recurseObjects_New($backrefs_list, $connection, $this->getStorage(), $ts, $loop_lists, 
+		static::recurseObjects_New($connection, $this->getStorage(), $ts, $loop_lists, 
 										$process_objects, $selector, "", $ticks, $locked_objects, $existing_records_global, $merge_by_pool, $merge_by_linked, 
 										$merge_by_posib_not_linked, $table_to_properties);
 		
@@ -162,7 +162,7 @@ trait QSqlTable_New
 				$process_objects_mby_not_linked[$tmp_app] = [$tmp_app, QModel::TransformMerge, null]; # object, parent, property
 				$locked_objects_tmp = [];
 				
-				static::recurseObjects_New($backrefs_list, $connection, $this->getStorage(), null, $loop_lists_mby_not_linked, 
+				static::recurseObjects_New($connection, $this->getStorage(), null, $loop_lists_mby_not_linked, 
 						$process_objects_mby_not_linked, $tmp_mby_not_linked_selector, "", $ticks, $locked_objects_tmp, 
 						$existing_records_global, $merge_by_pool, $merge_by_linked, 
 						$merge_by_posib_not_linked, $table_to_properties);
@@ -179,11 +179,11 @@ trait QSqlTable_New
 			unset($lo->_lk);
 		
 		# $connection, array $model_list, $ts = null, $selector
-		unset($process_objects, $loop_lists, $backrefs_list, $locked_objects, $merge_by_pool, $merge_by_linked, 
+		unset($process_objects, $loop_lists, $locked_objects, $merge_by_pool, $merge_by_linked, 
 					$merge_by_posib_not_linked, $existing_records_global, $arr, $table_to_properties);
 	}
 	
-	protected static function recurseObjects_New(array &$backrefs_list, $connection, $storage, $ts, array &$loop_lists, 
+	protected static function recurseObjects_New($connection, $storage, $ts, array &$loop_lists, 
 					SplObjectStorage $process_objects, $selector = null, string $path = '', int &$ticks = 0, 
 					array &$locked_objects = null, array &$existing_records_global = null, array &$merge_by_pool = null,
 					array &$merge_by_linked = null, array &$merge_by_posib_not_linked = null, array $table_to_properties = null)
@@ -293,7 +293,7 @@ trait QSqlTable_New
 						$connection->_stats->queries[] = "# {$path} :: {$parent_class_name_or_zero} :: {$class_name} ========================================================== ";
 						$transaction_item = new QSqlTable_Titem($path, $exec_items, $connection, $storage, $selector, $ts, $class_name, false);
 						list($extend_selector_tmp, ) = 
-									$transaction_item->run_model($backrefs_list, $parent_class_name_or_zero, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked);
+									$transaction_item->run_model($parent_class_name_or_zero, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked);
 						if ($extend_selector_tmp)
 						 	$extend_selector = $extend_selector ? qJoinSelectors($extend_selector, $extend_selector_tmp) : $extend_selector_tmp;
 
@@ -313,7 +313,7 @@ trait QSqlTable_New
 		foreach ($next_recurse_list as $k => $list)
 		{
 			$sub_sel = ($selector === true) ? true : ((substr($k, -2, 2) === '[]') ? $selector[substr($k, 0, -2)] : $selector[$k]);
-			static::recurseObjects_New($backrefs_list, $connection, $storage, $ts, $loop_lists, $list, $sub_sel, 
+			static::recurseObjects_New($connection, $storage, $ts, $loop_lists, $list, $sub_sel, 
 						$path ? $path.".".$k : $k, $ticks, $locked_objects, $existing_records_global, $merge_by_pool, $merge_by_linked, $merge_by_posib_not_linked, $table_to_properties);
 		}
 		
@@ -324,8 +324,12 @@ trait QSqlTable_New
 			# qvar_dumpk('$new_loop_list_coll KEYS', $new_loop_list_coll);
 			foreach ($new_loop_list_coll as $parent_class_name => $deep_items)
 			{
+				$parent_class_refl = \QModel::GetTypeByName($parent_class_name);
+				
 				foreach ($deep_items as $prop_name => $exec_items)
 				{
+					$collection_property = $parent_class_refl->properties[$prop_name];
+				
 					if ($exec_items)
 					{
 						$coll_path = $path ? ($path.".".$prop_name) : $prop_name;
@@ -333,7 +337,7 @@ trait QSqlTable_New
 						$connection->_stats->queries[] = "# {$coll_path} :: {$parent_class_name} / {$prop_name} ========================================================== ";
 						
 						$transaction_item_coll = new QSqlTable_Titem($coll_path, $exec_items, $connection, $storage, $selector, $ts, null, true, $parent_class_name, $prop_name);
-						$transaction_item_coll->run_collection($backrefs_list, $table_to_properties);
+						$transaction_item_coll->run_collection($table_to_properties, $collection_property);
 					
 						if ($transaction_item_coll->backrefs_list)
 							$transaction_elems[] = $transaction_item_coll;

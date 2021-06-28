@@ -1559,8 +1559,8 @@ class QApi
 
 		try
 		{
-			if (headers_sent())
-				throw new \Exception('headers_sent() we will not be able to login');
+			#if (headers_sent())
+			#	throw new \Exception('headers_sent() we will not be able to login');
 			
 			ob_start();
 			// unset data
@@ -1568,7 +1568,7 @@ class QApi
 
 			// public static function Logout($user_or_email = null, $session_id = null, bool $reset_context = true)
 			\Omi\User::Logout(null, null, false);
-			session_write_close();
+			# session_write_close();
 			
 			/* $is_my_partner = \QQuery("Partners.{Id WHERE Id=? AND Owner.Id=?}", [$partner->getId(), $owner->getId()])->Partners;
 			$is_my_partner = $is_my_partner ? $is_my_partner[0] : null;

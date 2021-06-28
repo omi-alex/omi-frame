@@ -37,6 +37,12 @@ final class QAutoload
 	 */
 	private static $WatchFoldersByTag = [];
 	/**
+	 * Watch folders tags to layer
+	 *
+	 * @var string[]
+	 */
+	private static $WatchFoldersTag_To_Layer = [];
+	/**
 	 * The list of folderes that are included as read-only
 	 *
 	 * @var string[]

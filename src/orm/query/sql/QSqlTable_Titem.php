@@ -27,7 +27,7 @@ final class QSqlTable_Titem
 	# determined
 	public $table_name;
 	public $model_type;
-	public $backrefs_list = [];
+	# public $backrefs_list = [];
 	
 	public function __construct(string $path, array $items, $connection, $storage, $selector, $ts, string $class_name = null, bool $is_collection = false)
 	{
@@ -41,7 +41,7 @@ final class QSqlTable_Titem
 		$this->is_collection = $is_collection;
 	}
 	
-	public function run_model(array &$backrefs_list, string $parent_class_name_or_zero, array &$existing_records_global, array &$merge_by_pool, array &$merge_by_linked, array &$merge_by_posib_not_linked)
+	public function run_model(string $parent_class_name_or_zero, array &$existing_records_global, array &$merge_by_pool, array &$merge_by_linked, array &$merge_by_posib_not_linked)
 	{
 		$ts = $this->ts;
 		$class_name = $this->class_name;
@@ -308,8 +308,8 @@ final class QSqlTable_Titem
 					$action &= ~QModel::TransformDelete;
 			}
 			
-			# getSqlInfo_model(array &$cache, array &$backrefs_list, QIModel $model, $selector = null)
-			$sql_info = $this->getSqlInfo_prepare_vals($sql_cache, $this->class_name, $sql_info_model, $backrefs_list, $model, $selector, $this->model_type->properties, $model_id);
+			# getSqlInfo_model(array &$cache, QIModel $model, $selector = null)
+			$sql_info = $this->getSqlInfo_prepare_vals($sql_cache, $this->class_name, $sql_info_model, $model, $selector, $this->model_type->properties, $model_id);
 			$entry_exists = false;
 			
 			if ($modify_action)
@@ -639,7 +639,7 @@ final class QSqlTable_Titem
 		return [$extend_selector ?: null, ];
 	}
 	
-	public function run_collection(array &$backrefs_list, array $table_to_properties)
+	public function run_collection(array $table_to_properties, \QModelProperty $property)
 	{
 		# mergeBy can be per type / collection
 		# mergeBy can be on run_model also, mergeBy can be anywhere where there is no ID
@@ -647,24 +647,14 @@ final class QSqlTable_Titem
 		
 		$ts = $this->ts;
 		$class_name = $this->class_name;
-		$this->model_type = \QModel::GetTypeByName($class_name);
+		# $this->model_type = \QModel::GetTypeByName($class_name);
 		$app_class_name = get_class(QApp::Data());
-		$is_top_lvl_class = ($class_name === $app_class_name);
+		# $is_top_lvl_class = ($class_name === $app_class_name);
 		
 		$sql_cache = [];
 		$connection = $this->connection;
-		$selector = $this->selector;
+		# $selector = $this->selector;
 		
-		list($first_collection) = reset($this->items);
-		
-		if (!$first_collection)
-			throw new \Exception('Missing first collection');
-		
-		# qvar_dumpk('$first_collection', $first_collection, $first_collection->getModelProperty());
-		$property = $first_collection->getModelProperty();
-		if (!$property)
-			throw new \Exception('Missing property');
-
 		$one_to_many = $property->isOneToMany();
 		$storage_table_obj = QApp::GetStorage()->getDefaultStorageContainerForType($property);
 		if (!$storage_table_obj)
@@ -705,14 +695,13 @@ final class QSqlTable_Titem
 		$collection_has_bkref_type = $sql_info['cols']['bkref_type'] ? true : false;
 		
 		$tmp_use_cols = [$sql_info["cols"]['ref'], $sql_info["cols"]['bkref']];
-									if ($collection_has_item_type)
-										$tmp_use_cols[] = $sql_info["cols"]['type'];
-									if ($collection_has_bkref_type)
-										$tmp_use_cols[] = $sql_info["cols"]['bkref_type'];
+		if ($collection_has_item_type)
+			$tmp_use_cols[] = $sql_info["cols"]['type'];
+		if ($collection_has_bkref_type)
+			$tmp_use_cols[] = $sql_info["cols"]['bkref_type'];
 		
-		# READ EXISTING DATA
+		# READING EXISTING DATA IN THIS SECTION
 		# if (!$one_to_many)
-		
 		{
 			foreach ($this->items as $model_inf)
 			{
@@ -731,7 +720,7 @@ final class QSqlTable_Titem
 
 					$rowid = (int)$model->getRowIdAtIndex($key);
 					
-					$uniqueness = null;
+					$uniqueness_key = null; $uniqueness_val = null;
 					// hasAnyInstantiableReferenceTypes
 					// for QIModel on one to many, the rowid is the ID of the element
 					if (($rowid === 0) && $item_is_model)
@@ -740,88 +729,71 @@ final class QSqlTable_Titem
 							$rowid = (int)$item->getId();
 						else if ($find_by_uniqueness && ($tmp_mp_id = $parent_id) && ($tmp_it_id = (int)$item->getId()))
 						{
-							$uniqueness = ["{$tmp_it_id}\x00{$tmp_mp_id}".
+							$uniqueness_key = "{$tmp_it_id}\x00{$tmp_mp_id}".
 												($collection_has_item_type ? "\x00".$item->get_Type_Id() : '').
-												($collection_has_bkref_type ? "\x00".$parent_type_id : ''), 
-											"({$tmp_it_id},{$tmp_mp_id}".
+												($collection_has_bkref_type ? "\x00".$parent_type_id : '');
+							$uniqueness_val = "({$tmp_it_id},{$tmp_mp_id}".
 												($collection_has_item_type ? ",".$item->get_Type_Id() : '').
 												($collection_has_bkref_type ? ",".$parent_type_id : '').
-												')'];
+												')';
 						}
 					}
 					
 					if (!$one_to_many)
 					{
-						# if ($rowid || $uniqueness)
 						{
 							// select & update
 							if ($rowid)
-							{
 								// $sql_select = "SELECT `".implode("`,`", $sql_info["cols"])."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
-								if (!isset($reading_queries_by_rowid[0]))
-								{
-									$reading_queries_by_rowid[0] = "SELECT `".implode("`,`", $sql_info["cols"])."`,`".$sql_info["id_col"]."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."` IN ";
-								}
-								$reading_queries_by_rowid[1][$rowid] = $rowid;
-								$reading_queries_by_rowid[2] = $sql_info["id_col"];
-							}
-							else if ($uniqueness) // by uniqueness
-							{
-								if (!isset($reading_queries_by_uniqn[0]))
-								{
-									$reading_queries_by_uniqn[0] = [
-											"SELECT `".implode("`,`", $tmp_use_cols)."`,`{$sql_info["id_col"]}` FROM {$sql_info["tab"]} WHERE (`".implode("`,`", $tmp_use_cols)."`) IN ",
-											$tmp_use_cols];
-								}
-								$reading_queries_by_uniqn[1][$uniqueness[0]] = $uniqueness[1];
-							}
+								$reading_queries_by_rowid[$rowid] = $rowid;
+							else if ($uniqueness_key !== null) // by uniqueness
+								$reading_queries_by_uniqn[$uniqueness_key] = $uniqueness_val;
 						}
 					}
 					# else // ONE TO MANY
-					else
+					else if ($rowid)
 					{
-						if ($rowid)
-						{
-							// $sql_select = "SELECT `".implode("`,`", $sql_info["cols"])."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
-							if (!isset($reading_queries_by_rowid[0]))
-							{
-								$reading_queries_by_rowid[0] = "SELECT `".implode("`,`", $sql_info["cols"])."`,`".$sql_info["id_col"]."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."` IN ";
-							}
-							$reading_queries_by_rowid[1][$rowid] = $rowid;
-							$reading_queries_by_rowid[2] = $sql_info["id_col"];
-						}
+						// $sql_select = "SELECT `".implode("`,`", $sql_info["cols"])."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."`=".$this->escapeScalar($rowid, $connection);
+						$reading_queries_by_rowid[$rowid] = $rowid;
 					}
+				}
+			}
+			if ($reading_queries_by_rowid)
+			{
+				$id_col_name = $sql_info["id_col"];
+				$reading_queries_by_rowid_sql = "SELECT `".implode("`,`", $sql_info["cols"])."`,`".$sql_info["id_col"]."` FROM {$sql_info["tab"]} WHERE `".$sql_info["id_col"]."` IN ";
+
+				$res = $this->query("{$reading_queries_by_rowid_sql}( ".implode(",", $reading_queries_by_rowid)." )");
+				if (!$res)
+				{
+					if (\QAutoload::GetDevelopmentMode())
+						qvar_dumpk($q);
+					throw new \Exception($connection->error);
+				}
+				while (($row = $res->fetch_assoc()))
+					$data_by_rowid[$row[$id_col_name]] = $row;
+			}
+
+			if ($reading_queries_by_uniqn)
+			{
+				$q = "SELECT `".implode("`,`", $tmp_use_cols)."`,`{$sql_info["id_col"]}` FROM {$sql_info["tab"]} WHERE (`".implode("`,`", $tmp_use_cols)."`) IN "
+						." (". implode(",", $reading_queries_by_uniqn).");";
+
+				$res = $this->query($q);
+				if (!$res)
+				{
+					if (\QAutoload::GetDevelopmentMode())
+						qvar_dumpk($q);
+					throw new \Exception($connection->error);
+				}
+				while (($row = $res->fetch_row()))
+				{
+					$record_id = array_pop($row);
+					$data_by_uniqueness[implode("\x00", $row)] = $record_id;
 				}
 			}
 		}
 		
-		if ($reading_queries_by_rowid && $reading_queries_by_rowid[1])
-		{
-			$id_col_name = $reading_queries_by_rowid[2];
-			$res = $this->query($reading_queries_by_rowid[0]."( ".implode(",", $reading_queries_by_rowid[1])." )");
-			if (!$res)
-				throw new \Exception($connection->error);
-			while (($row = $res->fetch_assoc()))
-				$data_by_rowid[$row[$id_col_name]] = $row;
-		}
-		
-		if ($reading_queries_by_uniqn && $reading_queries_by_uniqn[1])
-		{
-			$q = $reading_queries_by_uniqn[0][0]." (". implode(",", $reading_queries_by_uniqn[1]).");";
-			
-			$res = $this->query($q);
-			if (!$res)
-			{
-				if (\QAutoload::GetDevelopmentMode())
-					qvar_dumpk($q);
-				throw new \Exception($connection->error);
-			}
-			while (($row = $res->fetch_row()))
-			{
-				$record_id = array_pop($row);
-				$data_by_uniqueness[implode("\x00", $row)] = $record_id;
-			}
-		}
 		
 		$update_to_delete_queries = [];
 		
@@ -837,22 +809,18 @@ final class QSqlTable_Titem
 			$update = ($action & QModel::TransformUpdate);
 			$create = ($action & QModel::TransformCreate);
 			# $modify_action = $update || $create;
-			
-			#if ($this->path === 'Services[].Categories')
-			#	$connection->_stats->queries[] = "# Starting parent: ".$parent_id;
+			# delete is a no-op on a collection
 			
 			# if ($modify_action) # in case of any action
 			{
 				// this means all existing items NOT IN the $model will be removed from the collection
-				$replace_elements = ($model->_ts & QModel::TransformDelete) && (($model->_ts & QModel::TransformCreate) || ($model->_ts & QModel::TransformUpdate))
-										&& $parent_model && $parent_model->getId();
+				$replace_elements = $parent_model && $parent_id && ($model->_ts & QModel::TransformDelete) && 
+										(($model->_ts & QModel::TransformCreate) || ($model->_ts & QModel::TransformUpdate));
 				if ($replace_elements)
 					$replacements[$model] = $parent_model;
 				
 				foreach ($model as $key => $item)
 				{
-					# $connection->_stats->queries[] = "# Starting item: ".$item->getId();
-					
 					$item_is_model = ($item instanceof QIModel);
 					$item_action = $item_is_model ? (($item->_ts !== null) ? $item->_ts : QModel::TransformMerge) : null;
 					$item_update = $item_action ? ($item_action & QModel::TransformUpdate) : $update;
@@ -1427,7 +1395,7 @@ final class QSqlTable_Titem
 			$backrefs_list[$key][] = [$sql_info, $update_column, $reference, $row_identifier, null		   , null,			  $backrefs_collection_insert];
 	}
 	
-	protected function getSqlInfo_prepare_vals(array &$cache, string $class_name, array $sql_info_model, array &$backrefs_list, \QIModel $model, $selector, $props, int $model_id = null)
+	protected function getSqlInfo_prepare_vals(array &$cache, string $class_name, array $sql_info_model, \QIModel $model, $selector, $props, int $model_id = null)
 	{
 		$selector_isarr = is_array($selector);
 		

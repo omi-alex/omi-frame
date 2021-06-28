@@ -43,7 +43,7 @@ final class QTrace
 	public function init(bool $trace_request = false)
 	{
 		$m = null;
-		$reg_ex = "/^(\\/home\\/([^\\/]+)\\/)public\\_html(?:\$|\\/)(.*)\$/uis";
+		$reg_ex = "/^(\\/home\\/([^\\/]+)\\/)public\\_html(?:\\_[\\w\\d\\_]*)?(?:\$|\\/)(.*)\$/uis";
 		$rc = preg_match($reg_ex, Q_RUNNING_PATH, $m);
 		if ((!$rc) || (count($m) < 4))
 			throw new \Exception("Expecting Q_RUNNING_PATH to match pattern `{$reg_ex}`");
