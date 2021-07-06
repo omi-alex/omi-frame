@@ -794,7 +794,6 @@ final class QSqlTable_Titem
 			}
 		}
 		
-		
 		$update_to_delete_queries = [];
 		
 		# if ($this->path === 'Services[].Categories')
