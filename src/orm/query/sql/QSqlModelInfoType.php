@@ -128,7 +128,7 @@ class QSqlModelInfoType
 				
 				$root->_multitype[$orig_tname][$rowid_name] = $typ_col_name;
 				
-				QSqlModelInfoProperty::SetupSqlColumn(QSqlTableIndex::IndexNormal, $db_table, $typ_col_name, QSqlTableColumn::TypeSmallint, null, null, null, null, null, true, true, false, "Type column for table entry role");
+				QSqlModelInfoProperty::SetupSqlColumn(null, $db_table, $typ_col_name, QSqlTableColumn::TypeSmallint, null, null, null, null, null, true, true, false, "Type column for table entry role");
 			}
 			else if (!$root->_multitype[$orig_tname][$rowid_name])
 			{

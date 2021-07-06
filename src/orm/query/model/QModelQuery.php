@@ -28,6 +28,7 @@ class QModelQuery
 	{
 		try
 		{
+			$t1 = microtime(true);
 			# if (defined('QQQ_START_Qsss') && QQQ_START_Qsss)
 			#	qvar_dumpk($query);
 			
@@ -120,6 +121,11 @@ class QModelQuery
 		}
 		finally
 		{
+			$t2 = microtime(true);
+			
+			# if ($t2 - $t1 > 1)
+			#	qvar_dumpk($t2 - $t1, $query, $binds);
+			
 			\QTrace::End_Trace([], ['return' => $from]);
 			
 			# file_put_contents("test_alex_log_qq.txt", date("Y-m-d H:i:s.u")." | ".(microtime(true) - $t1_log).": [".json_encode($binds)."] ".str_replace("\n", " ", $query)."\n", FILE_APPEND);

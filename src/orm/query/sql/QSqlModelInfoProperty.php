@@ -473,7 +473,7 @@ class QSqlModelInfoProperty
 		
 		QSqlModelInfoType::SetPropertyWithType($db_table->name.".".$using_prop->name.($under_collection ? "[]" : ""));
 		
-		return QSqlModelInfoProperty::SetupSqlColumn(QSqlTableIndex::IndexNormal, $db_table, $name, QSqlTableColumn::TypeSmallint, null, null, null, null, null, true, true, false, $comment);
+		return QSqlModelInfoProperty::SetupSqlColumn(null, $db_table, $name, QSqlTableColumn::TypeSmallint, null, null, null, null, null, true, true, false, $comment);
 	}
 	
 	private static function GetDefaultColumnLength($type)

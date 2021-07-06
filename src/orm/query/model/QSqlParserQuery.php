@@ -425,7 +425,7 @@ class QSqlParserQuery
 		// define("MYSQL_USE_SQL_CALC_FOUND_ROWS", true);
 		$exe_q = $this->toSQL(defined("MYSQL_USE_SQL_CALC_FOUND_ROWS") ? MYSQL_USE_SQL_CALC_FOUND_ROWS : true);
 
-		if (false && \QAutoload::GetDevelopmentMode())
+		if ($_GET['deeeebug'] && \QAutoload::GetDevelopmentMode())
 		{
 			echo "<hr/>";
 			/*
@@ -453,6 +453,11 @@ class QSqlParserQuery
 		finally
 		{
 			\QTrace::End_Trace([], [$result ? true : false, $t2 - $t1], ["query", "sql"]);
+		}
+		
+		if ($_GET['deeeebug'] && \QAutoload::GetDevelopmentMode())
+		{
+			qvar_dumpk($t2 - $t1);
 		}
 		
 		if (($t2 - $t1) >= 30) # slow query log
@@ -816,6 +821,11 @@ class QSqlParserQuery
 							qvar_dumpk($this->_count_q ?: "SELECT FOUND_ROWS() AS `FOUND_ROWS`;");
 						}
 						throw new Exception($conn->error);
+					}
+					
+					if ($_GET['deeeebug'] && \QAutoload::GetDevelopmentMode())
+					{
+						qvar_dumpk($this->_count_q);
 					}
 
 					$found_rows = $calc_res->fetch_assoc();

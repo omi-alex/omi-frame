@@ -1676,13 +1676,15 @@ class QApi
 		{
 			static::$_Caller_Company_In_Callee_Box = $saved_caller_owner;
 			
-			\Omi\User::Logout();
-			session_write_close();
+			\Omi\User::Logout(null, null, false);
+			# session_write_close();
 			
 			\Omi\User::Set_Temporary_Session($saved_context['session_id']);
-			session_id($saved_context['session_id']);
-			session_start();
+			
+			# session_id($saved_context['session_id']);
+			# session_start();
 			// session_id($saved_context['session_id']);
+			
 			foreach ($saved_context['session'] as $k => $v)
 				$_SESSION[$k] = $v;
 			
@@ -1705,10 +1707,12 @@ class QApi
 				}
 			}
 			
-			$login_res = \Omi\User::LoginInternal($user->Username, $user->Password, $saved_context['session_id'], false);
+			# $login_res = \Omi\User::LoginInternal($user_or_email, $password, $new_session_id /* session_id() */, false, true);
+			$login_res = \Omi\User::LoginInternal($user->Username, $user->Password, $saved_context['session_id'], false, true);
+			
 			if (!$login_res)
 				throw new \Exception('Login failed for: '.$user->Username);
-			$login_identity = \Omi\User::CheckLogin();
+			$login_identity = \Omi\User::CheckLogin($saved_context['session_id']);
 			if (!$login_identity)
 				throw new \Exception('Login identity failed for: '.$user->Username);
 
