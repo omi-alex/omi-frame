@@ -889,8 +889,8 @@ trait QModel_Trait
 			if ($entityLoaded)
 			{
 				$syncItm = $_all_objects[$data->getId()."|". get_class($data)];
-				if ($syncItm === null)
-					file_put_contents("test_alex_GetRemoteSyncedData_nulls.txt", $data->getId()."|". get_class($data)."\n", FILE_APPEND);
+				# if ($syncItm === null)
+				# 	file_put_contents("test_alex_GetRemoteSyncedData_nulls.txt", $data->getId()."|". get_class($data)."\n", FILE_APPEND);
 				/*
 				if ($syncItm === null)
 				{

@@ -599,6 +599,9 @@ trait QModel_Security
 						case 'tree-box-customer':
 						{
 							$ret['relation'][] = 'parentPartner Customer.Owner.ParentsStack.Users';
+							/* $ret['relation'][] = 'parentPartner Customer.Id IN (SELECT Customers.{ IF(Id, Id, NULL) '.
+														'WHERE Owner.ParentsStack.Users.Id=? GROUP BY Id} )';
+							*/
 							break;
 						}
 						case 'customer-link':

@@ -1166,8 +1166,11 @@ class QApi
 			
 			$eps = static::Query('GenbandSBC_Endpoints', $selector.",MaxCalls", $parameters, $only_first, $id);
 			$nuv = static::Query('Nuvia_Users', $selector, $parameters_nuvia, $only_first, $id);
+			$f2_trunks = static::Query('F2_RE_Trunks', $selector.",Max_Channels", $parameters, $only_first, $id);
 			
 			foreach ($eps ?: [] as $e)
+				$list_of_services_entries[] = $e;
+			foreach ($f2_trunks ?: [] as $e)
 				$list_of_services_entries[] = $e;
 			foreach ($nuv ?: [] as $e)
 				$list_of_services_entries[] = $e;

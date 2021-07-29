@@ -92,14 +92,14 @@ trait QModel_Common_View
 	 * @return type
 	 */
 	public static function MixPropertyData($src_from_types, $k, $propAlias = null, $force_mandatory = false, 
-		$force_validation = null, $force_fix = null)
+		$force_validation = null, $force_fix = null, bool $in_search = false)
 	{
 		$r_types = [];
 		
 		if (is_string($src_from_types))
 			$src_from_types = [$src_from_types];
 
-		$src_from_types_indx = implode("~", $src_from_types)."~".$propAlias;
+		$src_from_types_indx = implode("~", $src_from_types)."~".$propAlias."~".($in_search ? '1' : '0');
 
 		if (static::$_PropertyData[$src_from_types_indx] && static::$_PropertyData[$src_from_types_indx][$k])
 			return static::$_PropertyData[$src_from_types_indx][$k];
