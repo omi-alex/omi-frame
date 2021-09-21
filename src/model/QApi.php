@@ -311,7 +311,7 @@ class QApi
 			{
 				if (count($security_filter) > 1)
 					throw new \Exception('Multiple filters are not supported');
-				$sql_filter = \QModel::ExtractSQLFilter(reset($security_filter), \Omi\User::GetGroupsList(), \QModel::GetFinalSecurityForAppProperty($src_from, 'relation', $property_reflection));
+				$sql_filter = \QModel::ExtractSQLFilter(reset($security_filter), \Omi\User::GetGroupsList() ?: [], \QModel::GetFinalSecurityForAppProperty($src_from, 'relation', $property_reflection));
 			}
 			
 			foreach ($src_from_types ?: [] as $src_from_types_ty)
