@@ -169,7 +169,7 @@ trait QViewBase_Methods
 			throw new Exception("missing parent");
 		return $this->_wp ?: ($this->parent ? ($this->_wp = $this->parent->getWebPage()) : null);
 	}
-		
+	
 	/**
 	 * Includes the JS & CSS resources for the specified PHP class (must be a web element), 
 	 * if none is specified it uses the class of this instance.

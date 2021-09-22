@@ -724,6 +724,7 @@ class QSqlTable extends QStorageTable
 							continue;
 
 						$value = $model->$p_name;
+						$old_sc_val = null;
 
 						$scalar_was_changed = false;
 						if ($cols_inf["val"] && (($old_sc_val = $record[$cols_inf["val"]]) !== $value))
@@ -749,8 +750,10 @@ class QSqlTable extends QStorageTable
 								$one_to_one_ops[$class_name][$p_name][] = [$model, $p_name, $one_to_one];
 							}
 
-							if ($p_name !== "_type")
-								$model->_ols[$p_name] = "n/a";
+							if (($p_name !== "_type") && (!isset($model->_ols[$p_name])))
+							{
+								$model->_ols[$p_name] = $old_sc_val ?? "n/a";
+							}
 						}
 					}
 
@@ -1564,6 +1567,7 @@ class QSqlTable extends QStorageTable
 		// select in bulk, update/delete in bulk
 		// pp statements
 		// Here we 'walk' the model and prepare data for the next steps
+		
 		$pure_populate = [];
 		foreach ($model_list as $model)
 			$this->recurseObjects($model, null, null, $selector, $all_objects, $all_objects_grouped, $merge_by_models, "", null, $populate, null, $pure_populate, $populate_before_merge_by);

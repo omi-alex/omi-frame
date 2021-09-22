@@ -1128,7 +1128,8 @@ trait QModel_Trait
 		if ($new_app_items === null)
 			$new_app_items = [];
 		# @TODO - UGLY FIX, recursive selector !!! This method should not recurse in depth, but go level by level
-		if ((substr($path, -strlen('.IncompatibleWith.IncompatibleWith')) === '.IncompatibleWith.IncompatibleWith') || ($path === '.IncompatibleWith.IncompatibleWith'))
+		if ((substr($path, -strlen('.IncompatibleWith.IncompatibleWith')) === '.IncompatibleWith.IncompatibleWith') || ($path === '.IncompatibleWith.IncompatibleWith') ||
+				(substr($path, -strlen('.Items.Merch.DefaultOffer.Items.Merch.DefaultOffer')) === '.Items.Merch.DefaultOffer.Items.Merch.DefaultOffer'))
 			throw new \Exception('this should not be again!');
 		
 		if (!$_bag)
@@ -1241,6 +1242,9 @@ trait QModel_Trait
 				# $expand_in_props = static::$Sync_Mapping["Offers.Items." . substr($prop_path, strlen("Offers.Services."))];
 				throw new \Exception('should not be needed!');
 			}
+			
+			if ($expand_in_props === true) # We skip
+				continue;
 			
 			$act_on_elements = ($value instanceof \QIModelArray) ? $value : [$value];
 			
@@ -2458,6 +2462,8 @@ trait QModel_Trait
 		"Offers.NuviaOffer.Item.Merch" => ['Omi\Nuvia\Service' => ["Nuvia_Services"], 'Omi\Nuvia\Product' => ["Nuvia_Products"]],
 		"Offers.Items" => false,
 		"Offers.Items.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.ProvisioningSettings" => false,
+		"Offers.Items.Merch.Content" => false,
 		"MerchItems.ProvisioningSettings" => false,
 		"MerchItems.Content" => false,
 		"Offers.Products" => false,
@@ -2467,6 +2473,21 @@ trait QModel_Trait
 		"Offers.Services.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
 		
 		"Offers.Content" => false,
+		"Offers.Items.Merch.DefaultOffer" => ["Offers"],
+		"Offers.Items.Merch.Manufacturer" => ["Manufacturers"],
+		"Offers.Items.Merch.Term" => ["Terms"],
+		"Offers.Items.Merch.Categories" => ["MerchCategories"],
+		"Offers.Items.Merch.Categories.Content" => false,
+		"Offers.Items.Merch.IncompatibleWith" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.AvailableOptions" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.AvailableOptions.ProvisioningSettings" => false,
+		"Offers.Items.Merch.AvailableOptions.Content" => false,
+		"Offers.Items.Merch.AvailableOptions.Categories" => ["MerchCategories"],
+		
+		"Offers.Items.Merch.Categories.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.Categories.Parent.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.Categories.Parent.Parent.Content" => false,
+		"Offers.Items.Merch.Categories.Parent.Content" => false,
 		"MerchItems.DefaultOffer" => ["Offers"],
 		"MerchItems.Manufacturer" => ["Manufacturers"],
 		"MerchItems.Term" => ["Terms"],
@@ -2486,6 +2507,42 @@ trait QModel_Trait
 		"MerchCategories.Brochures" => false,
 		
 		"MerchItems.IncompatibleFor" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer" => ["Offers"],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items" => false,
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Content" => false,		
+		
+		"Offers.Items.Merch.IncompatibleWith.Content" => false,
+		"Offers.Items.Merch.IncompatibleWith.Categories.Content" => false,
+		"Offers.Items.Merch.IncompatibleWith.Categories" => ["MerchCategories"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.IncompatibleWith.Manufacturer" => ["Manufacturers"],
+		"Offers.Items.Merch.IncompatibleWith.IncompatibleWith" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		
+		"Offers.Items.Merch.DefaultOffer.Items" => false,
+		"Offers.Items.Merch.DefaultOffer.Items.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.DefaultOffer.Content" => false,		
+		"Offers.Items.Merch.IncompatibleWith.Categories.Parent.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Parent.Content" => false,
+
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.ProvisioningSettings" => false,
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Content" => false,
+
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.DefaultOffer" => ["Offers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories" => ["MerchCategories"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Content" => false,
+		
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent.Parent" => ["MerchCategories"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent.Parent.Content" => false,
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Parent.Content" => false,
+
+		"Offers.Items.Merch.DefaultOffer.Services" => false,
+		"Offers.Items.Merch.DefaultOffer.Products" => false,
+		
+		"Offers.Items.Merch.DefaultOffer.Services.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
+		"Offers.Items.Merch.DefaultOffer.Products.Merch" => ['Omi\Comm\Service' => ["Services"], 'Omi\Comm\Product' => ["Products"]],
 
 		"MerchItems.IncompatibleWith.DefaultOffer" => ["Offers"],
 		"MerchItems.IncompatibleWith.DefaultOffer.Items" => false,
@@ -2529,18 +2586,62 @@ trait QModel_Trait
 		"Offers.Products.Merch.Owner" => ["Suppliers"],
 		"Offers.Products.Owner" => ["Suppliers"],
 		# "Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Owner" => ["Suppliers"],
 		"MerchItems.Content.Owner" => ["Suppliers"],
 		"MerchItems.Owner" => ["Suppliers"],
 		"Offers.Items.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Manufacturer.Owner" => ["Suppliers"],
 		"MerchItems.Manufacturer.Owner" => ["Suppliers"],
 		"Offers.Services.Owner" => ["Suppliers"],
 		"Offers.Services.Merch.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Categories.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Categories.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.AvailableOptions.Owner" => ["Suppliers"],
 		"MerchCategories.Content.Owner" => ["Suppliers"],
 		"MerchCategories.Owner" => ["Suppliers"],
 		"MerchItems.AvailableOptions.Owner" => ["Suppliers"],
 		
 		"MerchCategories.Brochures.Owner" => ["Suppliers"],
 		"Manufacturers.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.Categories.Parent.Parent.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Categories.Parent.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Manufacturer.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Categories.Parent.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Owner" => ["Suppliers"],
+
+		"Offers.Items.Merch.Categories.Parent.Parent.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Categories.Parent.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Manufacturer.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.Categories.Parent.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.Categories.Parent.Parent.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Parent.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.Categories.Parent.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.AvailableOptions.Content.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Items.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.IncompatibleWith.DefaultOffer.Owner" => ["Suppliers"],
+		
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Content.Owner" => ["Suppliers"],
+		"Offers.Items.Merch.DefaultOffer.Items.Merch.Categories.Owner" => ["Suppliers"],
 		
 		"MerchCategories.Parent.Parent.Owner" => ["Suppliers"],
 		"MerchCategories.Parent.Owner" => ["Suppliers"],
@@ -2589,6 +2690,27 @@ trait QModel_Trait
 		
 		# "Resellers.Suppliers" => ["Suppliers"],
 		"Suppliers.WhiteLabel" => false,
+		"Products.Owner" => ["Suppliers"],
+		"Services.Owner" => ["Suppliers"],
+		
+		"Nuvia_Offers.Content" => false,
+		"Nuvia_Offers.Item" => false,
+		"Nuvia_Offers.Item.Merch" => ["Nuvia_Services"],
+		"Nuvia_Offers.Items" => false,
+		"Nuvia_Offers.Currency" => ["Currencies"],
+		"Nuvia_Offers.CostCurrency" => ["Currencies"],
+		"Nuvia_Offers.Offer" => ["Offers"],
+		"Nuvia_Offers.Owner" => ["Suppliers"],
+		"Nuvia_Offers.CreatedBy" => ["Users"],
+		
+		"Nuvia_Services.Owner" => ["Suppliers"],
+		
+		"Nuvia_Services.CreatedBy" => ["Users"],
+		"Users.Person" => false,
+		"Users.Owner" => ["Suppliers"],
+		"Users.CreatedBy" => ["Users"],
+		"Users.Impersonate" => true,
+		"Users.Context" => true,
 		
 	];
 }
